@@ -176,8 +176,8 @@ export const FastInputModal: React.FC = () => {
       const cat = categories.find((c) => c.type === 'income') || null
       setSelectedCategory(cat)
       if (selectedAsset?.type === 'card') {
-        const bank = assets.find((a) => a.type === 'bank')
-        if (bank) setSelectedAsset(bank)
+        const cash = assets.find((a) => a.type === 'cash') || assets[0]
+        if (cash) setSelectedAsset(cash)
       }
     }
   }
@@ -481,7 +481,7 @@ export const FastInputModal: React.FC = () => {
                 className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
               >
                 <span className="text-sm shrink-0">{selectedAsset?.icon || '💳'}</span>
-                <span className="truncate">{selectedAsset?.name || '자산'}</span>
+                <span className="truncate">{selectedAsset?.name || '결제수단'}</span>
                 <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
               </button>
             </div>

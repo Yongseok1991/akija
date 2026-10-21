@@ -12,9 +12,9 @@ export const AssetOverview: React.FC = () => {
 
   // New asset form state
   const [newAssetName, setNewAssetName] = useState('')
-  const [newAssetType, setNewAssetType] = useState<AssetType>('bank')
+  const [newAssetType, setNewAssetType] = useState<AssetType>('card')
   const [newAssetBalance, setNewAssetBalance] = useState('')
-  const [newAssetIcon, setNewAssetIcon] = useState('🏦')
+  const [newAssetIcon, setNewAssetIcon] = useState('💳')
 
   // Calculate Asset breakdown
   const cashAndBanks = assets.filter((a) => a.type === 'cash' || a.type === 'bank')
@@ -138,7 +138,7 @@ export const AssetOverview: React.FC = () => {
                 <span className="text-2xl">{asset.icon}</span>
                 <div>
                   <div className="font-semibold text-sm text-slate-200">{asset.name}</div>
-                  <div className="text-[11px] text-slate-400">신용카드</div>
+                  <div className="text-[11px] text-slate-400">신용/체크카드</div>
                 </div>
               </div>
 

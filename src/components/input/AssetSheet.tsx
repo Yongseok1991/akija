@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
-import { X, Wallet, Landmark, CreditCard } from 'lucide-react'
-import type { Asset, AssetType } from '../../types'
+import React, { useState, useEffect } from 'react'
+import { X, Wallet, CreditCard, Check } from 'lucide-react'
+import type { Asset } from '../../types'
 import { formatKRW } from '../../utils/formatters'
 
 interface AssetSheetProps {
@@ -18,15 +18,25 @@ export const AssetSheet: React.FC<AssetSheetProps> = ({
   assets,
   selectedAssetId,
   onSelectAsset,
-  title = '결제 수단 (자산) 선택',
+  title = '결제 수단 선택',
 }) => {
-  const [activeTab, setActiveTab] = useState<AssetType>('card')
+  const currentAsset = assets.find((a) => a.id === selectedAssetId)
+  const [activeTab, setActiveTab] = useState<'card' | 'cash'>(
+    currentAsset?.type === 'cash' ? 'cash' : 'card'
+  )
+
+  useEffect(() => {
+    if (isOpen) {
+      const ast = assets.find((a) => a.id === selectedAssetId)
+      if (ast?.type === 'cash') setActiveTab('cash')
+      else setActiveTab('card')
+    }
+  }, [isOpen, selectedAssetId, assets])
 
   if (!isOpen) return null
 
-  const tabs: { key: AssetType; label: string; icon: React.ReactNode }[] = [
-    { key: 'card', label: '신용카드', icon: <CreditCard className="w-4 h-4" /> },
-    { key: 'bank', label: '은행/계좌', icon: <Landmark className="w-4 h-4" /> },
+  const tabs: { key: 'card' | 'cash'; label: string; icon: React.ReactNode }[] = [
+    { key: 'card', label: '신용/체크카드', icon: <CreditCard className="w-4 h-4" /> },
     { key: 'cash', label: '현금', icon: <Wallet className="w-4 h-4" /> },
   ]
 
@@ -47,7 +57,7 @@ export const AssetSheet: React.FC<AssetSheetProps> = ({
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
           <div>
             <h3 className="text-lg font-bold text-slate-100">{title}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">자산을 터치하면 바로 선택됩니다</p>
+            <p className="text-xs text-slate-400 mt-0.5">결제 수단을 터치하면 바로 선택됩니다</p>
           </div>
           <button
             type="button"
@@ -58,9 +68,9 @@ export const AssetSheet: React.FC<AssetSheetProps> = ({
           </button>
         </div>
 
-        {/* 3-segment Tab */}
+        {/* 2-segment Tab (신용/체크카드 | 현금) */}
         <div className="p-3 bg-slate-950/50">
-          <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-800/80 rounded-2xl border border-slate-700/50">
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-800/80 rounded-2xl border border-slate-700/50">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.key
               return (
@@ -86,7 +96,7 @@ export const AssetSheet: React.FC<AssetSheetProps> = ({
         <div className="p-4 overflow-y-auto max-h-[50vh] space-y-2.5">
           {filteredAssets.length === 0 ? (
             <div className="text-center py-8 text-slate-500 text-sm">
-              등록된 {activeTab === 'card' ? '카드' : activeTab === 'bank' ? '은행' : '현금'} 자산이 없습니다.
+              등록된 {activeTab === 'card' ? '신용/체크카드' : '현금'}가 없습니다.
             </div>
           ) : (
             filteredAssets.map((asset) => {
@@ -110,21 +120,26 @@ export const AssetSheet: React.FC<AssetSheetProps> = ({
                     <div className="text-left">
                       <div className="font-semibold text-sm text-slate-100">{asset.name}</div>
                       <div className="text-xs text-slate-400 mt-0.5">
-                        {asset.type === 'card' ? '신용카드' : asset.type === 'bank' ? '계좌' : '현금'}
+                        {asset.type === 'card' ? '신용/체크카드' : '현금'}
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-slate-400">
-                      {asset.type === 'card' ? '이번달 누적' : '현재 잔액'}
-                    </div>
-                    <div
-                      className={`text-sm font-bold ${
-                        asset.type === 'card' ? 'text-amber-400' : 'text-emerald-400'
-                      }`}
-                    >
-                      {formatKRW(asset.balance)}
-                    </div>
+                    {asset.type === 'card' ? (
+                      isSelected ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">
+                          <Check className="w-3.5 h-3.5" />
+                          선택됨
+                        </span>
+                      ) : null
+                    ) : (
+                      <>
+                        <div className="text-xs text-slate-400">현재 잔액</div>
+                        <div className="text-sm font-bold text-emerald-400">
+                          {formatKRW(asset.balance)}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </button>
               )

@@ -349,11 +349,11 @@ export const FastInputModal: React.FC = () => {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col">
           {/* 2. Native Samsung Keyboard Amount Input Field */}
           <div className="px-5 py-3 text-center bg-slate-950/40 border-y border-slate-800/60 relative">
             <div className="text-[11px] text-slate-400 font-medium mb-1">
-              금액 입력 (삼성 키보드)
+              금액 입력
             </div>
 
             <div className="flex items-center justify-center gap-1.5">
@@ -372,7 +372,6 @@ export const FastInputModal: React.FC = () => {
                   ref={amountInputRef}
                   type="text"
                   inputMode="numeric"
-                  pattern="[0-9]*"
                   value={amountStr}
                   onChange={handleAmountChange}
                   placeholder="0"

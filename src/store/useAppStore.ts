@@ -203,11 +203,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { success: false, error: bioRes.error }
     }
 
-    let username = 'rimbong'
+    let username = 'yongseok'
     try {
       const sessionStr = localStorage.getItem('akija_owner_session')
       if (sessionStr) {
-        username = JSON.parse(sessionStr).username || 'rimbong'
+        username = JSON.parse(sessionStr).username || 'yongseok'
       }
     } catch {
       // fallback

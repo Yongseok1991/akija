@@ -6,7 +6,7 @@ import { isBiometricAvailable, hasRegisteredBiometrics } from '../../utils/webAu
 export const AuthScreen: React.FC = () => {
   const { signIn, unlockWithBiometrics, isLoading } = useAppStore()
 
-  const [username, setUsername] = useState('rimbong')
+  const [username, setUsername] = useState('yongseok')
   const [password, setPassword] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)

@@ -60,7 +60,7 @@ export const SettingsView: React.FC = () => {
 
   const handleRegisterBiometrics = async () => {
     setBioMsg(null)
-    const res = await registerBiometrics(user?.username || 'rimbong')
+    const res = await registerBiometrics(user?.username || 'yongseok')
     if (res.success) {
       setBioRegistered(true)
       setBioMsg({ type: 'success', text: '지문이 성공적으로 등록되었습니다! 다음 접속 시 지문으로 열 수 있습니다.' })
@@ -185,7 +185,7 @@ export const SettingsView: React.FC = () => {
             <div>
               <div className="text-xs text-slate-400 font-medium">단독 소유자 계정</div>
               <div className="text-sm font-bold text-slate-100 font-mono">
-                {user?.username || 'rimbong'}
+                {user?.username || 'yongseok'}
               </div>
             </div>
           </div>

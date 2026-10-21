@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import {
   X,
   Calendar,
@@ -9,6 +9,7 @@ import {
   Camera,
   Image as ImageIcon,
   Check,
+  History,
 } from 'lucide-react'
 import type { TransactionType, Category, Asset } from '../../types'
 import { useAppStore } from '../../store/useAppStore'
@@ -39,6 +40,7 @@ export const FastInputModal: React.FC = () => {
     updateTransaction,
     categories,
     assets,
+    transactions,
   } = useAppStore()
 
   // Input states
@@ -49,6 +51,7 @@ export const FastInputModal: React.FC = () => {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [toAsset, setToAsset] = useState<Asset | null>(null) // For transfers
   const [memo, setMemo] = useState<string>('')
+  const [isMemoFocused, setIsMemoFocused] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageSizeKb, setImageSizeKb] = useState<number | null>(null)
   const [isCompressing, setIsCompressing] = useState(false)
@@ -110,6 +113,62 @@ export const FastInputModal: React.FC = () => {
       }, 150)
     }
   }, [isInputModalOpen, editingTransaction])
+
+  // 기존 작성된 거래 내역 기반 메모 자동완성 목록 계산
+  const memoSuggestions = useMemo(() => {
+    if (!isMemoFocused) return []
+
+    // 유니크 메모 집계: 빈도수 및 최근 연결된 카테고리
+    const map = new Map<string, { count: number; categoryId?: string }>()
+    for (const t of transactions) {
+      const m = (t.memo || '').trim()
+      if (!m) continue
+      const existing = map.get(m)
+      if (existing) {
+        existing.count++
+        if (!existing.categoryId && t.category_id) existing.categoryId = t.category_id
+      } else {
+        map.set(m, { count: 1, categoryId: t.category_id })
+      }
+    }
+
+    const query = memo.trim().toLowerCase()
+    const all = Array.from(map.entries()).map(([text, meta]) => ({
+      text,
+      count: meta.count,
+      categoryId: meta.categoryId,
+    }))
+
+    if (!query) {
+      // 입력창이 비어있을 때: 가장 자주 사용한 상위 5개 메모 추천
+      return all.sort((a, b) => b.count - a.count).slice(0, 5)
+    }
+
+    // 검색어 입력 중: 검색어가 포함된 내역 필터링 (앞자리 일치 우선 -> 빈도수 순)
+    const filtered = all.filter((item) => item.text.toLowerCase().includes(query))
+    return filtered
+      .sort((a, b) => {
+        const aStarts = a.text.toLowerCase().startsWith(query) ? 1 : 0
+        const bStarts = b.text.toLowerCase().startsWith(query) ? 1 : 0
+        if (aStarts !== bStarts) return bStarts - aStarts
+        return b.count - a.count
+      })
+      .slice(0, 6)
+  }, [transactions, memo, isMemoFocused])
+
+  // 자동완성 메모 항목 선택 핸들러 (메모 입력 및 카테고리 자동 매칭)
+  const handleSelectMemo = (item: { text: string; categoryId?: string }) => {
+    setMemo(item.text)
+    setIsMemoFocused(false)
+
+    // 이전에 해당 메모에 사용되었던 카테고리가 있으면 카테고리도 스마트 자동 선택
+    if (item.categoryId && type !== 'transfer') {
+      const matchedCat = categories.find((c) => c.id === item.categoryId)
+      if (matchedCat) {
+        setSelectedCategory(matchedCat)
+      }
+    }
+  }
 
   if (!isInputModalOpen) return null
 
@@ -235,19 +294,6 @@ export const FastInputModal: React.FC = () => {
     return `${parseInt(parts[1])}/${parseInt(parts[2])}`
   }
 
-  const QUICK_MEMO_SUGGESTIONS = [
-    '점심',
-    '저녁',
-    '커피',
-    '마트',
-    '편의점',
-    '술',
-    '배달',
-    '생활용품',
-    '주유',
-    '쇼핑',
-  ]
-
   return (
     <div className="fixed inset-0 z-40 flex flex-col justify-end">
       {/* Background Dim */}
@@ -343,7 +389,7 @@ export const FastInputModal: React.FC = () => {
           {/* 2. Native Samsung Keyboard Amount Input Field */}
           <div className="px-5 py-3 text-center bg-slate-950/40 border-y border-slate-800/60 relative">
             <div className="text-[11px] text-slate-400 font-medium mb-1">
-              금액 입력 (스마트폰 숫자 키보드)
+              금액 입력 (삼성 키보드)
             </div>
 
             <div className="flex items-center justify-center gap-1.5">
@@ -500,51 +546,93 @@ export const FastInputModal: React.FC = () => {
               )}
             </div>
 
-            {/* Memo Input Row with Camera Button */}
-            <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-2">
-              <input
-                type="text"
-                value={memo}
-                onChange={(e) => setMemo(e.target.value)}
-                placeholder="내용 / 메모 입력 (선택)"
-                className="flex-1 min-w-0 bg-transparent text-slate-100 text-xs focus:outline-none placeholder:text-slate-500 font-medium"
-              />
-              {memo && (
+            {/* Memo Input Row with Camera Button & Real History Autocomplete */}
+            <div className="relative">
+              <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-2 focus-within:border-blue-500 focus-within:bg-slate-800 transition-all">
+                <input
+                  type="text"
+                  value={memo}
+                  onChange={(e) => setMemo(e.target.value)}
+                  onFocus={() => setIsMemoFocused(true)}
+                  onBlur={() => {
+                    // 항목 클릭 터치가 먼저 실행될 수 있도록 200ms 지연 후 닫기
+                    setTimeout(() => setIsMemoFocused(false), 200)
+                  }}
+                  placeholder="내용 / 메모 입력 (기존 내역 자동완성)"
+                  className="flex-1 min-w-0 bg-transparent text-slate-100 text-xs focus:outline-none placeholder:text-slate-500 font-medium"
+                />
+                {memo && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMemo('')
+                      setIsMemoFocused(true)
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-200"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setMemo('')}
-                  className="p-1 text-slate-400 hover:text-slate-200"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isCompressing}
+                  className={`p-1.5 rounded-lg border transition-all shrink-0 ${
+                    imageUrl
+                      ? 'bg-blue-600/30 border-blue-500 text-blue-400'
+                      : 'bg-slate-750/80 border-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="영수증 사진 첨부"
                 >
-                  <X className="w-3 h-3" />
+                  <Camera className="w-3.5 h-3.5" />
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isCompressing}
-                className={`p-1.5 rounded-lg border transition-all shrink-0 ${
-                  imageUrl
-                    ? 'bg-blue-600/30 border-blue-500 text-blue-400'
-                    : 'bg-slate-750/80 border-slate-700 text-slate-400 hover:text-slate-200'
-                }`}
-                title="영수증 사진 첨부"
-              >
-                <Camera className="w-3.5 h-3.5" />
-              </button>
-            </div>
+              </div>
 
-            {/* Quick Memo Tags Carousel */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-              {QUICK_MEMO_SUGGESTIONS.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setMemo(memo ? `${memo} ${tag}` : tag)}
-                  className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700/60 hover:border-slate-600 whitespace-nowrap active:scale-95 transition-all shrink-0"
-                >
-                  {tag}
-                </button>
-              ))}
+              {/* Autocomplete Dropdown from Previous Memos */}
+              {isMemoFocused && memoSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-slate-850/95 border border-slate-700/80 rounded-2xl shadow-2xl backdrop-blur-md overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 bg-slate-900/80 border-b border-slate-850 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <History className="w-3 h-3 text-blue-400" />
+                      <span>기존 작성 메모 추천</span>
+                    </span>
+                    <span className="text-slate-500 font-normal">선택 시 카테고리 자동 지정</span>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-800/60 no-scrollbar">
+                    {memoSuggestions.map((item) => {
+                      const cat = categories.find((c) => c.id === item.categoryId)
+                      return (
+                        <div
+                          key={item.text}
+                          onPointerDown={() => handleSelectMemo(item)}
+                          className="flex items-center justify-between px-3.5 py-2.5 hover:bg-blue-600/15 active:bg-blue-600/25 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {cat ? (
+                              <span className="text-sm shrink-0" title={cat.name}>
+                                {cat.icon}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-500 shrink-0">📝</span>
+                            )}
+                            <span className="text-xs font-semibold text-slate-200 truncate">
+                              {item.text}
+                            </span>
+                            {cat && (
+                              <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded shrink-0">
+                                {cat.name}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400 shrink-0 ml-2 font-mono">
+                            {item.count}회
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Photo Preview Thumbnail (if attached) */}

@@ -61,17 +61,26 @@ export const AssetOverview: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-slate-750/80">
             <div>
-              <div className="text-xs text-emerald-400 font-medium">보유 자산 (현금/예금)</div>
+              <div className="text-xs text-emerald-400 font-medium">보유 자산 (현금)</div>
               <div className="text-base sm:text-lg font-bold text-emerald-300 mt-0.5">
                 +{formatKRW(totalAssets)}
               </div>
             </div>
-            <div>
-              <div className="text-xs text-rose-400 font-medium">부채 (신용카드 결제 예정)</div>
-              <div className="text-base sm:text-lg font-bold text-rose-300 mt-0.5">
-                -{formatKRW(totalLiabilities)}
+            {totalLiabilities > 0 ? (
+              <div>
+                <div className="text-xs text-rose-400 font-medium">부채 (미결제액)</div>
+                <div className="text-base sm:text-lg font-bold text-rose-300 mt-0.5">
+                  -{formatKRW(totalLiabilities)}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div>
+                <div className="text-xs text-blue-400 font-medium">등록 결제수단</div>
+                <div className="text-base sm:text-lg font-bold text-slate-200 mt-0.5">
+                  {cards.length}개 카드
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -118,14 +127,14 @@ export const AssetOverview: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Credit Cards (Liabilities) */}
+      {/* 3. Credit / Debit Cards */}
       <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-5 shadow-lg space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CreditCard className="w-4 h-4 text-rose-400" />
-            <h3 className="font-bold text-slate-100 text-sm">부채 (신용카드 미결제 대금)</h3>
+            <CreditCard className="w-4 h-4 text-blue-400" />
+            <h3 className="font-bold text-slate-100 text-sm">결제 카드 (신용/체크카드)</h3>
           </div>
-          <span className="text-xs font-bold text-rose-400">{formatKRW(totalLiabilities)}</span>
+          <span className="text-xs font-semibold text-slate-400">{cards.length}개 등록됨</span>
         </div>
 
         <div className="divide-y divide-slate-800">
@@ -138,22 +147,14 @@ export const AssetOverview: React.FC = () => {
                 <span className="text-2xl">{asset.icon}</span>
                 <div>
                   <div className="font-semibold text-sm text-slate-200">{asset.name}</div>
-                  <div className="text-[11px] text-slate-400">신용/체크카드</div>
+                  <div className="text-[11px] text-slate-400">결제 수단</div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-rose-300">
-                  {formatKRW(asset.balance)}
+                <span className="text-xs font-medium text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700/60">
+                  결제 전용
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setEditingAsset(asset)}
-                  className="p-1.5 text-slate-400 hover:text-blue-400 rounded-lg hover:bg-slate-800 transition-all"
-                  title="미결제액 수정"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                </button>
               </div>
             </div>
           ))}

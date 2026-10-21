@@ -118,7 +118,7 @@ function adjustAssetBalance(
     if (type === 'expense') {
       if (asset.id === assetId) {
         if (asset.type === 'card') {
-          return { ...asset, balance: asset.balance + amount * multiplier }
+          return asset // 신용/체크카드는 누적 잔액을 기록하지 않음
         } else {
           return { ...asset, balance: asset.balance - amount * multiplier }
         }
@@ -126,7 +126,7 @@ function adjustAssetBalance(
     } else if (type === 'income') {
       if (asset.id === assetId) {
         if (asset.type === 'card') {
-          return { ...asset, balance: asset.balance - amount * multiplier }
+          return asset
         } else {
           return { ...asset, balance: asset.balance + amount * multiplier }
         }

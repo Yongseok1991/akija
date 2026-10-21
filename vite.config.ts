@@ -69,7 +69,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
-        cleanupOutdatedCaches: true
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true
       }
     })
   ]

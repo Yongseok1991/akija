@@ -23,12 +23,14 @@ import {
   getSupabase,
   supabasePullAll,
   supabaseInsertTransaction,
+  supabaseInsertTransactionsBatch,
   supabaseUpdateTransaction,
   supabaseDeleteTransaction,
   supabaseUpsertAssets,
   supabaseUpsertCategories,
   supabaseDeleteCategory,
   supabaseUpsertBudget,
+  formatSupabaseError,
 } from '../lib/supabase'
 
 // 브라우저 로컬스토리지 잔여 가계부 캐시 완전 삭제 (Supabase 단일 소스 원칙)
@@ -234,7 +236,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       created_at: new Date().toISOString(),
     }
 
-    const nextTxList = [newTx, ...get().transactions]
     const nextAssets = adjustAssetBalance(
       get().assets,
       newTx.type,
@@ -243,12 +244,30 @@ export const useAppStore = create<AppState>((set, get) => ({
       newTx.to_asset_id
     )
 
-    set({ transactions: nextTxList, assets: nextAssets, isInputModalOpen: false, editingTransaction: null })
+    const validCatIds = new Set(get().categories.map((c) => c.id))
+    const validAssetIds = new Set(get().assets.map((a) => a.id))
 
-    await Promise.all([
-      supabaseInsertTransaction(newTx),
+    // Supabase에 먼저 반영
+    const [txRes, assetRes] = await Promise.all([
+      supabaseInsertTransaction(newTx, validCatIds, validAssetIds),
       supabaseUpsertAssets(nextAssets),
     ])
+
+    if (!txRes.success) {
+      alert(`클라우드 저장 실패: ${formatSupabaseError(txRes.error)}`)
+      return
+    }
+    if (!assetRes.success) {
+      console.warn('자산 잔액 클라우드 동기화 실패:', assetRes.error)
+    }
+
+    const nextTxList = [newTx, ...get().transactions]
+    set({
+      transactions: nextTxList,
+      assets: nextAssets,
+      isInputModalOpen: false,
+      editingTransaction: null,
+    })
   },
 
   // 2. 트랜잭션 수정: Supabase 직접 갱신
@@ -276,14 +295,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       false
     )
 
-    const nextTxList = get().transactions.map((t) => (t.id === updatedTx.id ? updatedTx : t))
+    const validCatIds = new Set(get().categories.map((c) => c.id))
+    const validAssetIds = new Set(get().assets.map((a) => a.id))
 
-    set({ transactions: nextTxList, assets: nextAssets, isInputModalOpen: false, editingTransaction: null })
-
-    await Promise.all([
-      supabaseUpdateTransaction(updatedTx),
+    const [txRes, assetRes] = await Promise.all([
+      supabaseUpdateTransaction(updatedTx, validCatIds, validAssetIds),
       supabaseUpsertAssets(nextAssets),
     ])
+
+    if (!txRes.success) {
+      alert(`클라우드 수정 실패: ${formatSupabaseError(txRes.error)}`)
+      return
+    }
+    if (!assetRes.success) {
+      console.warn('자산 잔액 클라우드 동기화 실패:', assetRes.error)
+    }
+
+    const nextTxList = get().transactions.map((t) => (t.id === updatedTx.id ? updatedTx : t))
+    set({
+      transactions: nextTxList,
+      assets: nextAssets,
+      isInputModalOpen: false,
+      editingTransaction: null,
+    })
   },
 
   // 3. 트랜잭션 삭제: Supabase 직접 삭제
@@ -300,14 +334,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       true
     )
 
-    const nextTxList = get().transactions.filter((t) => t.id !== id)
-
-    set({ transactions: nextTxList, assets: nextAssets })
-
-    await Promise.all([
+    const [delRes, assetRes] = await Promise.all([
       supabaseDeleteTransaction(id),
       supabaseUpsertAssets(nextAssets),
     ])
+
+    if (!delRes.success) {
+      alert(`클라우드 삭제 실패: ${formatSupabaseError(delRes.error)}`)
+      return
+    }
+    if (!assetRes.success) {
+      console.warn('자산 잔액 클라우드 동기화 실패:', assetRes.error)
+    }
+
+    const nextTxList = get().transactions.filter((t) => t.id !== id)
+    set({ transactions: nextTxList, assets: nextAssets })
   },
 
   // 카테고리 관리: Supabase 직접 반영
@@ -317,26 +358,38 @@ export const useAppStore = create<AppState>((set, get) => ({
       id: generateUUID(),
     }
     const nextCats = [...get().categories, newCat]
+    const res = await supabaseUpsertCategories(nextCats)
+    if (!res.success) {
+      alert(`카테고리 저장 실패: ${formatSupabaseError(res.error)}`)
+      return
+    }
     set({ categories: nextCats })
-    await supabaseUpsertCategories(nextCats)
   },
 
   updateCategory: async (cat) => {
     const nextCats = get().categories.map((c) => (c.id === cat.id ? cat : c))
+    const res = await supabaseUpsertCategories(nextCats)
+    if (!res.success) {
+      alert(`카테고리 수정 실패: ${formatSupabaseError(res.error)}`)
+      return
+    }
     set({ categories: nextCats })
-    await supabaseUpsertCategories(nextCats)
   },
 
   deleteCategory: async (id) => {
+    const res = await supabaseDeleteCategory(id)
+    if (!res.success) {
+      alert(`카테고리 삭제 실패: ${formatSupabaseError(res.error)}`)
+      return
+    }
     const nextCats = get().categories.filter((c) => c.id !== id)
     set({ categories: nextCats })
-    await supabaseDeleteCategory(id)
   },
 
   reorderCategories: async (cats) => {
     const ordered = cats.map((c, idx) => ({ ...c, sort_order: idx + 1 }))
-    set({ categories: ordered })
     await supabaseUpsertCategories(ordered)
+    set({ categories: ordered })
   },
 
   // 자산 관리: Supabase 직접 반영
@@ -346,27 +399,44 @@ export const useAppStore = create<AppState>((set, get) => ({
       id: generateUUID(),
     }
     const nextAssets = [...get().assets, newAsset]
+    const res = await supabaseUpsertAssets(nextAssets)
+    if (!res.success) {
+      alert(`자산 저장 실패: ${formatSupabaseError(res.error)}`)
+      return
+    }
     set({ assets: nextAssets })
-    await supabaseUpsertAssets(nextAssets)
   },
 
   updateAsset: async (asset) => {
     const nextAssets = get().assets.map((a) => (a.id === asset.id ? asset : a))
+    const res = await supabaseUpsertAssets(nextAssets)
+    if (!res.success) {
+      alert(`자산 수정 실패: ${formatSupabaseError(res.error)}`)
+      return
+    }
     set({ assets: nextAssets })
-    await supabaseUpsertAssets(nextAssets)
   },
 
   deleteAsset: async (id) => {
     const sb = getSupabase()
+    if (sb) {
+      const { error } = await sb.from('assets').delete().eq('id', id)
+      if (error) {
+        alert(`자산 삭제 실패: ${formatSupabaseError(error)}`)
+        return
+      }
+    }
     const nextAssets = get().assets.filter((a) => a.id !== id)
     set({ assets: nextAssets })
-    if (sb) {
-      await sb.from('assets').delete().eq('id', id)
-    }
   },
 
   // 예산 관리: Supabase 직접 반영
   setBudget: async (yearMonth, amount) => {
+    const res = await supabaseUpsertBudget({ year_month: yearMonth, amount })
+    if (!res.success) {
+      alert(`예산 저장 실패: ${formatSupabaseError(res.error)}`)
+      return
+    }
     const existingIndex = get().budgets.findIndex((b) => b.year_month === yearMonth)
     let nextBudgets: Budget[]
     if (existingIndex >= 0) {
@@ -377,7 +447,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       nextBudgets = [...get().budgets, { year_month: yearMonth, amount }]
     }
     set({ budgets: nextBudgets })
-    await supabaseUpsertBudget({ year_month: yearMonth, amount })
   },
 
   // 엑셀 / CSV 가져오기: 파싱 후 Supabase로 직접 일괄 전송
@@ -386,6 +455,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     let currentAssets = [...get().assets]
     const currentTransactions = [...get().transactions]
 
+    // 카테고리/자산이 비어있다면 기본값으로 보강
+    if (currentCategories.length === 0) {
+      const expenseCats: Category[] = DEFAULT_EXPENSE_CATEGORIES.map((c) => ({
+        ...c,
+        id: generateUUID(),
+      }))
+      const incomeCats: Category[] = DEFAULT_INCOME_CATEGORIES.map((c) => ({
+        ...c,
+        id: generateUUID(),
+      }))
+      currentCategories = [...expenseCats, ...incomeCats]
+    }
+    if (currentAssets.length === 0) {
+      currentAssets = DEFAULT_ASSETS.map((a) => ({
+        ...a,
+        id: generateUUID(),
+        balance: 0,
+      }))
+    }
+
+    // 1. 새 카테고리 매핑 및 준비
     const categoryMapping = new Map<string, string>()
     if (result.newCategories.length > 0) {
       result.newCategories.forEach((nc) => {
@@ -393,9 +483,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentCategories.push({ ...nc, id: newId })
         categoryMapping.set(nc.name, newId)
       })
-      await supabaseUpsertCategories(currentCategories)
     }
 
+    // 2. 카테고리가 Supabase에 먼저 온전히 반영되도록 업서트 (외래키 제약조건 방지)
+    const catUpsertRes = await supabaseUpsertCategories(currentCategories)
+    if (!catUpsertRes.success) {
+      throw new Error(`카테고리 클라우드 동기화 실패: ${formatSupabaseError(catUpsertRes.error)}`)
+    }
+
+    const validCatIds = new Set(currentCategories.map((c) => c.id))
+    const defaultAssetId = currentAssets[0]?.id || ''
+
+    // 3. 트랜잭션 중복 검사 및 변환
     const newTxs: Transaction[] = []
     result.transactions.forEach((t) => {
       const exists = currentTransactions.some(
@@ -406,10 +505,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (catId && categoryMapping.has(catId)) {
           catId = categoryMapping.get(catId)!
         }
+        if (!catId || !validCatIds.has(catId)) {
+          catId = currentCategories.find((c) => c.name.includes('기타'))?.id || currentCategories[0]?.id
+        }
+
+        let assetId = t.asset_id
+        if (!assetId || !currentAssets.some((a) => a.id === assetId)) {
+          assetId = defaultAssetId
+        }
 
         const newTx: Transaction = {
           ...t,
           category_id: catId,
+          asset_id: assetId,
           id: generateUUID(),
           created_at: new Date().toISOString(),
         }
@@ -425,6 +533,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     })
 
+    if (newTxs.length === 0) {
+      return
+    }
+
+    // 4. 자산 잔액 업데이트 및 외래키 존재 보장
+    const assetUpsertRes = await supabaseUpsertAssets(currentAssets)
+    if (!assetUpsertRes.success) {
+      throw new Error(`자산 클라우드 동기화 실패: ${formatSupabaseError(assetUpsertRes.error)}`)
+    }
+
+    const validAssetIds = new Set(currentAssets.map((a) => a.id))
+
+    // 5. Supabase에 트랜잭션 일괄 배치 저장
+    const txInsertRes = await supabaseInsertTransactionsBatch(newTxs, validCatIds, validAssetIds)
+    if (!txInsertRes.success) {
+      throw new Error(`거래 내역 클라우드 저장 실패: ${formatSupabaseError(txInsertRes.error)}`)
+    }
+
+    // 6. 클라우드 DB 저장이 100% 성공했을 때만 로컬 UI 상태 갱신
     const combinedTxs = [...newTxs, ...currentTransactions]
     set({
       categories: currentCategories,
@@ -433,17 +560,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       isExcelModalOpen: false,
       isCsvModalOpen: false,
     })
-
-    // Supabase에 직접 일괄 저장 (100개 단위 배치)
-    const sb = getSupabase()
-    if (sb && newTxs.length > 0) {
-      const batchSize = 100
-      for (let i = 0; i < newTxs.length; i += batchSize) {
-        const chunk = newTxs.slice(i, i + batchSize)
-        await sb.from('transactions').insert(chunk)
-      }
-      await supabaseUpsertAssets(currentAssets)
-    }
   },
 
   importParsedCsv: async (result: ParsedExcelResult) => {

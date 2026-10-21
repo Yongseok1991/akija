@@ -61,6 +61,9 @@ interface AppState {
   isExcelModalOpen: boolean
   isCsvModalOpen: boolean
   editingTransaction: Transaction | null
+  searchQuery: string
+  filterType: 'all' | 'expense' | 'income'
+  isSearchOpen: boolean
 
   // Tab & Modal Navigation
   setActiveTab: (tab: TabType) => void
@@ -71,6 +74,9 @@ interface AppState {
   closeExcelModal: () => void
   openCsvModal: () => void
   closeCsvModal: () => void
+  setSearchQuery: (query: string) => void
+  setFilterType: (filter: 'all' | 'expense' | 'income') => void
+  setIsSearchOpen: (open: boolean) => void
 
   // 100% Supabase Cloud CRUD Operations
   initCloudData: () => Promise<void>
@@ -156,6 +162,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   isExcelModalOpen: false,
   isCsvModalOpen: false,
   editingTransaction: null,
+  searchQuery: '',
+  filterType: 'all',
+  isSearchOpen: false,
 
   setActiveTab: (tab) => set({ activeTab: tab }),
 
@@ -173,6 +182,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeExcelModal: () => set({ isExcelModalOpen: false, isCsvModalOpen: false }),
   openCsvModal: () => set({ isExcelModalOpen: true, isCsvModalOpen: true }),
   closeCsvModal: () => set({ isExcelModalOpen: false, isCsvModalOpen: false }),
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  setFilterType: (filter) => set({ filterType: filter }),
+  setIsSearchOpen: (open) => set({ isSearchOpen: open }),
 
   // 100% Supabase 전용 초기 로드 및 시딩
   initCloudData: async () => {

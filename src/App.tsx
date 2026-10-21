@@ -22,7 +22,7 @@ export function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center justify-center space-y-3 select-none">
+      <div className="min-h-screen bg-[#0d0f12] text-slate-100 flex flex-col items-center justify-center space-y-3 select-none">
         <div className="w-9 h-9 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
         <span className="text-xs text-slate-400 font-medium">Supabase 클라우드 연결 중...</span>
       </div>
@@ -30,7 +30,7 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans select-none antialiased">
+    <div className="min-h-screen bg-[#0d0f12] text-slate-100 flex flex-col font-sans select-none antialiased">
       {/* PWA Fullscreen Install Banner (Only shown if running in browser with URL bar) */}
       <PwaInstallPrompt />
 
@@ -38,7 +38,7 @@ export function App() {
       <Header />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-lg w-full mx-auto px-4 py-4 pb-28">
+      <main className="flex-1 max-w-lg w-full mx-auto px-4 py-3 pb-28">
         {/* 1번 탭 (첫 진입 화면): 해당 월 가계부 목록 */}
         {activeTab === 'daily' && (
           <div className="space-y-4">

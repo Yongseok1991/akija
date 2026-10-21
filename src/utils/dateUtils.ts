@@ -25,6 +25,31 @@ export function formatKoreanDate(dateStr: string): string {
   }
 }
 
+export function formatGroupDate(dateStr: string): string {
+  try {
+    const todayStr = getTodayString()
+    const [y, m, d] = dateStr.split('-').map(Number)
+    const date = new Date(y, m - 1, d)
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+    const dayName = dayNames[date.getDay()]
+
+    if (dateStr === todayStr) {
+      return `${d}일 오늘`
+    }
+
+    const yest = new Date()
+    yest.setDate(yest.getDate() - 1)
+    const yestStr = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, '0')}-${String(yest.getDate()).padStart(2, '0')}`
+    if (dateStr === yestStr) {
+      return `${d}일 어제`
+    }
+
+    return `${d}일 ${dayName}요일`
+  } catch {
+    return dateStr
+  }
+}
+
 export function formatMonthHeader(yearMonth: string): string {
   try {
     const [y, m] = yearMonth.split('-').map(Number)

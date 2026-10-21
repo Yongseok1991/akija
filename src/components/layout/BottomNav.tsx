@@ -14,11 +14,11 @@ export const BottomNav: React.FC = () => {
   const { activeTab, setActiveTab, openInputModal } = useAppStore()
 
   const tabs: { key: TabType; label: string; icon: React.ReactNode }[] = [
-    { key: 'daily', label: '내역', icon: <ReceiptText className="w-5 h-5" /> },
+    { key: 'daily', label: '가계부', icon: <ReceiptText className="w-5 h-5" /> },
     { key: 'calendar', label: '달력', icon: <CalendarDays className="w-5 h-5" /> },
-    { key: 'stats', label: '통계', icon: <PieChart className="w-5 h-5" /> },
     { key: 'assets', label: '자산', icon: <WalletCards className="w-5 h-5" /> },
-    { key: 'settings', label: '관리', icon: <Settings2 className="w-5 h-5" /> },
+    { key: 'stats', label: '통계', icon: <PieChart className="w-5 h-5" /> },
+    { key: 'settings', label: '설정', icon: <Settings2 className="w-5 h-5" /> },
   ]
 
   return (
@@ -36,7 +36,7 @@ export const BottomNav: React.FC = () => {
       </div>
 
       {/* Bottom Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-20 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800/80 pb-safe">
+      <nav className="fixed bottom-0 left-0 right-0 z-20 bg-[#0d0f12]/95 backdrop-blur-lg border-t border-slate-800/80 pb-safe">
         <div className="max-w-lg mx-auto flex items-center justify-around px-2 py-1.5">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.key

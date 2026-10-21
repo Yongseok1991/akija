@@ -5,13 +5,12 @@ import {
   ChevronDown,
   TrendingDown,
   TrendingUp,
-  Repeat,
   Camera,
   Image as ImageIcon,
   Check,
   History,
 } from 'lucide-react'
-import type { TransactionType, Category, Asset } from '../../types'
+import type { Category, Asset } from '../../types'
 import { useAppStore } from '../../store/useAppStore'
 import { CategorySheet } from './CategorySheet'
 import { AssetSheet } from './AssetSheet'
@@ -43,13 +42,12 @@ export const FastInputModal: React.FC = () => {
     transactions,
   } = useAppStore()
 
-  // Input states
-  const [type, setType] = useState<TransactionType>('expense')
+  // Input states (지출 또는 수입)
+  const [type, setType] = useState<'expense' | 'income'>('expense')
   const [amountStr, setAmountStr] = useState<string>('')
   const [date, setDate] = useState<string>(getTodayString())
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
-  const [toAsset, setToAsset] = useState<Asset | null>(null) // For transfers
   const [memo, setMemo] = useState<string>('')
   const [isMemoFocused, setIsMemoFocused] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -64,14 +62,13 @@ export const FastInputModal: React.FC = () => {
   // Bottom sheet triggers
   const [isCategorySheetOpen, setIsCategorySheetOpen] = useState(false)
   const [isAssetSheetOpen, setIsAssetSheetOpen] = useState(false)
-  const [isToAssetSheetOpen, setIsToAssetSheetOpen] = useState(false)
 
   // Initialize or reset on open
   useEffect(() => {
     if (isInputModalOpen) {
       if (editingTransaction) {
         // Edit mode
-        setType(editingTransaction.type)
+        setType(editingTransaction.type === 'income' ? 'income' : 'expense')
         setAmountStr(formatAmount(editingTransaction.amount))
         setDate(editingTransaction.date)
         setMemo(editingTransaction.memo || '')
@@ -83,11 +80,6 @@ export const FastInputModal: React.FC = () => {
 
         const ast = assets.find((a) => a.id === editingTransaction.asset_id) || assets[0] || null
         setSelectedAsset(ast)
-
-        const toAst = editingTransaction.to_asset_id
-          ? assets.find((a) => a.id === editingTransaction.to_asset_id) || null
-          : null
-        setToAsset(toAst)
       } else {
         // Smart Default mode: 오늘 날짜, 지출
         setType('expense')
@@ -102,9 +94,6 @@ export const FastInputModal: React.FC = () => {
 
         const defaultAsset = assets.find((a) => a.type === 'card') || assets[0] || null
         setSelectedAsset(defaultAsset)
-
-        const defaultToAsset = assets.find((a) => a.type === 'bank') || assets[1] || null
-        setToAsset(defaultToAsset)
       }
 
       // 모바일 삼성 키보드 자동 팝업
@@ -162,18 +151,19 @@ export const FastInputModal: React.FC = () => {
     setIsMemoFocused(false)
 
     // 이전에 해당 메모에 사용되었던 카테고리가 있으면 카테고리도 스마트 자동 선택
-    if (item.categoryId && type !== 'transfer') {
+    if (item.categoryId) {
       const matchedCat = categories.find((c) => c.id === item.categoryId)
       if (matchedCat) {
         setSelectedCategory(matchedCat)
+        setType(matchedCat.type)
       }
     }
   }
 
   if (!isInputModalOpen) return null
 
-  // Type change handler
-  const handleTypeChange = (newType: TransactionType) => {
+  // Type change handler (지출 / 수입)
+  const handleTypeChange = (newType: 'expense' | 'income') => {
     setType(newType)
     if (newType === 'expense') {
       const cat = categories.find((c) => c.type === 'expense') || null
@@ -241,25 +231,14 @@ export const FastInputModal: React.FC = () => {
       return
     }
 
-    if (type === 'transfer' && !toAsset) {
-      alert('입금 받을 자산을 선택해 주세요.')
-      return
-    }
-
-    if (type === 'transfer' && selectedAsset.id === toAsset?.id) {
-      alert('출금 자산과 입금 자산이 동일합니다. 다른 자산을 선택해 주세요.')
-      return
-    }
-
     if (editingTransaction) {
       updateTransaction({
         ...editingTransaction,
         type,
         amount: finalAmount,
         date,
-        category_id: type !== 'transfer' ? selectedCategory?.id : undefined,
+        category_id: selectedCategory?.id,
         asset_id: selectedAsset.id,
-        to_asset_id: type === 'transfer' ? toAsset?.id : undefined,
         memo,
         image_url: imageUrl || undefined,
       })
@@ -268,9 +247,8 @@ export const FastInputModal: React.FC = () => {
         type,
         amount: finalAmount,
         date,
-        category_id: type !== 'transfer' ? selectedCategory?.id : undefined,
+        category_id: selectedCategory?.id,
         asset_id: selectedAsset.id,
-        to_asset_id: type === 'transfer' ? toAsset?.id : undefined,
         memo,
         image_url: imageUrl || undefined,
       })
@@ -329,8 +307,6 @@ export const FastInputModal: React.FC = () => {
               ? '가계부 내역 수정'
               : type === 'income'
               ? '수입 등록'
-              : type === 'transfer'
-              ? '이체 등록'
               : '지출 등록'}
           </span>
           <div className="w-10 h-1 bg-slate-700 rounded-full" />
@@ -343,9 +319,9 @@ export const FastInputModal: React.FC = () => {
           </button>
         </div>
 
-        {/* 1. Transaction Type 3-Tab (지출, 수입, 이체) */}
+        {/* 1. Transaction Type 2-Tab (지출, 수입) */}
         <div className="px-4 py-1.5">
-          <div className="grid grid-cols-3 p-1 bg-slate-800/90 rounded-2xl border border-slate-750">
+          <div className="grid grid-cols-2 p-1 bg-slate-800/90 rounded-2xl border border-slate-750">
             <button
               type="button"
               onClick={() => handleTypeChange('expense')}
@@ -370,18 +346,6 @@ export const FastInputModal: React.FC = () => {
               <TrendingUp className="w-3.5 h-3.5" />
               <span>수입</span>
             </button>
-            <button
-              type="button"
-              onClick={() => handleTypeChange('transfer')}
-              className={`flex items-center justify-center gap-1.5 py-2 rounded-xl font-bold text-xs transition-all ${
-                type === 'transfer'
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              <Repeat className="w-3.5 h-3.5" />
-              <span>이체</span>
-            </button>
           </div>
         </div>
 
@@ -397,12 +361,10 @@ export const FastInputModal: React.FC = () => {
                 className={`text-2xl font-black ${
                   type === 'expense'
                     ? 'text-rose-400'
-                    : type === 'income'
-                    ? 'text-emerald-400'
-                    : 'text-blue-400'
+                    : 'text-emerald-400'
                 }`}
               >
-                {type === 'expense' ? '-' : type === 'income' ? '+' : ''}
+                {type === 'expense' ? '-' : '+'}
               </span>
 
               <div className="relative inline-flex items-center justify-center max-w-[280px]">
@@ -502,48 +464,26 @@ export const FastInputModal: React.FC = () => {
               </button>
 
               {/* Category Button */}
-              {type !== 'transfer' ? (
-                <button
-                  type="button"
-                  onClick={() => setIsCategorySheetOpen(true)}
-                  className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
-                >
-                  <span className="text-sm shrink-0">{selectedCategory?.icon || '🏷️'}</span>
-                  <span className="truncate">{selectedCategory?.name || '분류'}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsAssetSheetOpen(true)}
-                  className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
-                >
-                  <span className="truncate">{selectedAsset?.name || '출금'}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setIsCategorySheetOpen(true)}
+                className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+              >
+                <span className="text-sm shrink-0">{selectedCategory?.icon || '🏷️'}</span>
+                <span className="truncate">{selectedCategory?.name || '분류'}</span>
+                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+              </button>
 
               {/* Asset Button */}
-              {type !== 'transfer' ? (
-                <button
-                  type="button"
-                  onClick={() => setIsAssetSheetOpen(true)}
-                  className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
-                >
-                  <span className="text-sm shrink-0">{selectedAsset?.icon || '💳'}</span>
-                  <span className="truncate">{selectedAsset?.name || '자산'}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsToAssetSheetOpen(true)}
-                  className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
-                >
-                  <span className="truncate">{toAsset?.name || '입금'}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setIsAssetSheetOpen(true)}
+                className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+              >
+                <span className="text-sm shrink-0">{selectedAsset?.icon || '💳'}</span>
+                <span className="truncate">{selectedAsset?.name || '자산'}</span>
+                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+              </button>
             </div>
 
             {/* Memo Input Row with Camera Button & Real History Autocomplete */}
@@ -555,7 +495,6 @@ export const FastInputModal: React.FC = () => {
                   onChange={(e) => setMemo(e.target.value)}
                   onFocus={() => setIsMemoFocused(true)}
                   onBlur={() => {
-                    // 항목 클릭 터치가 먼저 실행될 수 있도록 200ms 지연 후 닫기
                     setTimeout(() => setIsMemoFocused(false), 200)
                   }}
                   placeholder="내용 / 메모 입력 (기존 내역 자동완성)"
@@ -671,7 +610,7 @@ export const FastInputModal: React.FC = () => {
           <div className="px-4 pt-1 pb-4">
             <button
               type="submit"
-              className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm sm:text-base rounded-2xl shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 active:scale-98 transition-all"
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm sm:text-base rounded-2xl shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer"
             >
               <Check className="w-5 h-5 stroke-[2.5]" />
               <span>{editingTransaction ? '가계부 내역 수정 완료' : '가계부에 저장하기'}</span>
@@ -687,27 +626,17 @@ export const FastInputModal: React.FC = () => {
         categories={categories}
         selectedCategoryId={selectedCategory?.id}
         onSelectCategory={(cat) => setSelectedCategory(cat)}
-        type={type === 'income' ? 'income' : 'expense'}
+        type={type}
       />
 
-      {/* Asset Bottom Sheet (Source) */}
+      {/* Asset Bottom Sheet */}
       <AssetSheet
         isOpen={isAssetSheetOpen}
         onClose={() => setIsAssetSheetOpen(false)}
         assets={assets}
         selectedAssetId={selectedAsset?.id}
         onSelectAsset={(ast) => setSelectedAsset(ast)}
-        title={type === 'transfer' ? '출금 자산 선택' : '결제 수단 선택'}
-      />
-
-      {/* To Asset Bottom Sheet (Destination for Transfer) */}
-      <AssetSheet
-        isOpen={isToAssetSheetOpen}
-        onClose={() => setIsToAssetSheetOpen(false)}
-        assets={assets.filter((a) => a.id !== selectedAsset?.id)}
-        selectedAssetId={toAsset?.id}
-        onSelectAsset={(ast) => setToAsset(ast)}
-        title="입금 자산 선택"
+        title="결제 수단 선택"
       />
     </div>
   )

@@ -14,7 +14,11 @@ import {
 } from '../lib/constants'
 import { getCurrentYearMonth } from '../utils/dateUtils'
 import { generateUUID } from '../utils/formatters'
-import { exportToUserCsv, type ParsedCsvResult } from '../utils/csvHandler'
+import {
+  exportToExcelFile,
+  exportToUserCsv,
+  type ParsedExcelResult,
+} from '../utils/excelHandler'
 import {
   getSupabase,
   supabasePullAll,
@@ -52,6 +56,7 @@ interface AppState {
   isLoading: boolean
   isCloudConnected: boolean
   isInputModalOpen: boolean
+  isExcelModalOpen: boolean
   isCsvModalOpen: boolean
   editingTransaction: Transaction | null
 
@@ -60,6 +65,8 @@ interface AppState {
   setCurrentYearMonth: (ym: string) => void
   openInputModal: (tx?: Transaction | null) => void
   closeInputModal: () => void
+  openExcelModal: () => void
+  closeExcelModal: () => void
   openCsvModal: () => void
   closeCsvModal: () => void
 
@@ -83,8 +90,10 @@ interface AppState {
   // Budgets
   setBudget: (yearMonth: string, amount: number) => Promise<void>
 
-  // CSV
-  importParsedCsv: (result: ParsedCsvResult) => Promise<void>
+  // Excel & CSV
+  importParsedExcel: (result: ParsedExcelResult) => Promise<void>
+  importParsedCsv: (result: ParsedExcelResult) => Promise<void>
+  exportExcel: () => Blob
   exportCSV: () => string
 
   // JSON Backup & Reset
@@ -142,6 +151,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoading: true,
   isCloudConnected: false,
   isInputModalOpen: false,
+  isExcelModalOpen: false,
   isCsvModalOpen: false,
   editingTransaction: null,
 
@@ -157,8 +167,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ isInputModalOpen: false, editingTransaction: null })
   },
 
-  openCsvModal: () => set({ isCsvModalOpen: true }),
-  closeCsvModal: () => set({ isCsvModalOpen: false }),
+  openExcelModal: () => set({ isExcelModalOpen: true, isCsvModalOpen: true }),
+  closeExcelModal: () => set({ isExcelModalOpen: false, isCsvModalOpen: false }),
+  openCsvModal: () => set({ isExcelModalOpen: true, isCsvModalOpen: true }),
+  closeCsvModal: () => set({ isExcelModalOpen: false, isCsvModalOpen: false }),
 
   // 100% Supabase 전용 초기 로드 및 시딩
   initCloudData: async () => {
@@ -368,8 +380,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     await supabaseUpsertBudget({ year_month: yearMonth, amount })
   },
 
-  // CSV 가져오기: 파싱 후 Supabase로 직접 대량 전송
-  importParsedCsv: async (result: ParsedCsvResult) => {
+  // 엑셀 / CSV 가져오기: 파싱 후 Supabase로 직접 일괄 전송
+  importParsedExcel: async (result: ParsedExcelResult) => {
     let currentCategories = [...get().categories]
     let currentAssets = [...get().assets]
     const currentTransactions = [...get().transactions]
@@ -392,7 +404,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!exists) {
         let catId = t.category_id
         if (catId && categoryMapping.has(catId)) {
-          catId = categoryMapping.get(catId)
+          catId = categoryMapping.get(catId)!
         }
 
         const newTx: Transaction = {
@@ -418,15 +430,28 @@ export const useAppStore = create<AppState>((set, get) => ({
       categories: currentCategories,
       assets: currentAssets,
       transactions: combinedTxs,
+      isExcelModalOpen: false,
       isCsvModalOpen: false,
     })
 
-    // Supabase에 직접 일괄 저장
+    // Supabase에 직접 일괄 저장 (100개 단위 배치)
     const sb = getSupabase()
     if (sb && newTxs.length > 0) {
-      await sb.from('transactions').insert(newTxs)
+      const batchSize = 100
+      for (let i = 0; i < newTxs.length; i += batchSize) {
+        const chunk = newTxs.slice(i, i + batchSize)
+        await sb.from('transactions').insert(chunk)
+      }
       await supabaseUpsertAssets(currentAssets)
     }
+  },
+
+  importParsedCsv: async (result: ParsedExcelResult) => {
+    return get().importParsedExcel(result)
+  },
+
+  exportExcel: () => {
+    return exportToExcelFile(get().transactions, get().categories, get().assets)
   },
 
   exportCSV: () => {

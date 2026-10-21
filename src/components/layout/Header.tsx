@@ -1,10 +1,10 @@
 import React from 'react'
-import { ChevronLeft, ChevronRight, FileUp } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import { formatMonthHeader, getAdjacentYearMonth, getCurrentYearMonth } from '../../utils/dateUtils'
 
 export const Header: React.FC = () => {
-  const { currentYearMonth, setCurrentYearMonth, openCsvModal, isCloudConnected } = useAppStore()
+  const { currentYearMonth, setCurrentYearMonth, openExcelModal, isCloudConnected } = useAppStore()
 
   const isCurrentMonth = currentYearMonth === getCurrentYearMonth()
 
@@ -70,12 +70,12 @@ export const Header: React.FC = () => {
 
           <button
             type="button"
-            onClick={openCsvModal}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-bold active:scale-95 transition-all"
-            title="CSV 데이터 가져오기"
+            onClick={openExcelModal}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold active:scale-95 transition-all"
+            title="엑셀 데이터 가져오기 (.xlsx, .xls)"
           >
-            <FileUp className="w-3.5 h-3.5" />
-            <span>CSV</span>
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>엑셀</span>
           </button>
         </div>
       </div>

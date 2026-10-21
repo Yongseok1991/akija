@@ -8,11 +8,11 @@ import { StatsView } from './components/stats/StatsView'
 import { AssetOverview } from './components/assets/AssetOverview'
 import { SettingsView } from './components/settings/SettingsView'
 import { FastInputModal } from './components/input/FastInputModal'
-import { CsvImportModal } from './components/common/CsvImportModal'
+import { ExcelImportModal } from './components/common/ExcelImportModal'
 import { useAppStore } from './store/useAppStore'
 
 export function App() {
-  const { activeTab, isLoading, initCloudData, isCsvModalOpen, closeCsvModal } = useAppStore()
+  const { activeTab, isLoading, initCloudData, isExcelModalOpen, closeExcelModal } = useAppStore()
 
   // 100% Supabase 클라우드 데이터 즉시 로드
   useEffect(() => {
@@ -62,8 +62,8 @@ export function App() {
       {/* Zero OS Keyboard Fast Input Modal */}
       <FastInputModal />
 
-      {/* CSV Import Modal (Paste & File Upload) */}
-      <CsvImportModal isOpen={isCsvModalOpen} onClose={closeCsvModal} />
+      {/* Excel Import Modal (File Upload & Paste) */}
+      <ExcelImportModal isOpen={isExcelModalOpen} onClose={closeExcelModal} />
     </div>
   )
 }

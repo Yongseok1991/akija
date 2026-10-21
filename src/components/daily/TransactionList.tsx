@@ -47,7 +47,7 @@ export const TransactionList: React.FC = () => {
         <div className="text-4xl mb-3">📝</div>
         <div className="text-base font-semibold text-slate-300">이번 달 내역이 없습니다</div>
         <div className="text-xs text-slate-400 mt-1">
-          상단의 <span className="text-blue-400 font-bold">CSV</span> 버튼으로 기존 내역을 불러오거나, 하단 <span className="text-blue-400 font-bold">+</span>로 새 지출을 기록하세요!
+          상단의 <span className="text-emerald-400 font-bold">엑셀</span> 버튼으로 기존 내역을 불러오거나, 하단 <span className="text-blue-400 font-bold">+</span>로 새 지출을 기록하세요!
         </div>
       </div>
     )

@@ -33,8 +33,9 @@ export const SettingsView: React.FC = () => {
     currentYearMonth,
     exportDataJSON,
     importDataJSON,
+    exportExcel,
     exportCSV,
-    openCsvModal,
+    openExcelModal,
     resetToDefaults,
     initCloudData,
   } = useAppStore()
@@ -117,6 +118,17 @@ export const SettingsView: React.FC = () => {
     setIsTestingSupabase(false)
   }
 
+  // Export Excel (.xlsx)
+  const handleExportExcel = () => {
+    const blob = exportExcel()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `가계부_${new Date().toISOString().slice(0, 10)}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // Export User CSV (11 columns with UTF-8 BOM)
   const handleExportCSV = () => {
     const csvContent = exportCSV()
@@ -164,33 +176,48 @@ export const SettingsView: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* 1. CSV Import / Export Card (가장 유용한 사용자 데이터 허브) */}
-      <div className="bg-gradient-to-br from-blue-900/40 to-slate-850 border border-blue-500/30 rounded-3xl p-5 shadow-lg space-y-3">
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="w-5 h-5 text-blue-400" />
-          <h3 className="font-bold text-slate-100 text-sm">가계부 CSV 데이터 관리</h3>
+      {/* 1. Excel Import / Export Card */}
+      <div className="bg-gradient-to-br from-emerald-950/40 via-slate-850 to-slate-900 border border-emerald-500/30 rounded-3xl p-5 shadow-lg space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+            <h3 className="font-bold text-slate-100 text-sm">가계부 엑셀(Excel) 데이터 관리</h3>
+          </div>
+          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+            .xlsx 지원
+          </span>
         </div>
         <p className="text-xs text-slate-400">
-          사용하시는 11컬럼 CSV 형식 파일을 언제든 가져오거나(Import), 엑셀/스프레드시트용 파일로 내보낼 수 있습니다.
+          편한가계부 및 표준 엑셀 파일(.xlsx, .xls)을 언제든 가져오거나(Import), 현재 가계부 내역을 엑셀 파일로 바로 내보낼 수(Export) 있습니다.
         </p>
 
         <div className="grid grid-cols-2 gap-2 pt-1">
           <button
             type="button"
-            onClick={openCsvModal}
-            className="py-3 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md shadow-blue-500/20"
+            onClick={openExcelModal}
+            className="py-3 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md shadow-emerald-500/20"
           >
             <Upload className="w-4 h-4" />
-            <span>CSV 가져오기 (Import)</span>
+            <span>엑셀 가져오기 (Import)</span>
           </button>
 
           <button
             type="button"
-            onClick={handleExportCSV}
+            onClick={handleExportExcel}
             className="py-3 px-3 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all"
           >
             <Download className="w-4 h-4 text-emerald-400" />
-            <span>CSV 내보내기 (Export)</span>
+            <span>엑셀 내보내기 (.xlsx)</span>
+          </button>
+        </div>
+
+        <div className="flex justify-end pt-0.5">
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="text-[11px] text-slate-400 hover:text-slate-300 underline"
+          >
+            CSV 포맷으로 내보내기
           </button>
         </div>
       </div>

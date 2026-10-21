@@ -13,17 +13,19 @@ import {
   Calendar,
   Flame,
   Scale,
+  ChevronDown,
 } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import { formatKRW } from '../../utils/formatters'
 import { getAdjacentYearMonth } from '../../utils/dateUtils'
 
 export const StatsView: React.FC = () => {
-  const { currentYearMonth, setCurrentYearMonth, transactions, categories, assets } = useAppStore()
+  const { currentYearMonth, setCurrentYearMonth, transactions, categories, assets, openInputModal } = useAppStore()
 
   // Tab: 'expense' (지출 분석) | 'income' (수입 분석)
   const [analysisType, setAnalysisType] = useState<'expense' | 'income'>('expense')
   const [statsSearchQuery, setStatsSearchQuery] = useState('')
+  const [expandedCatId, setExpandedCatId] = useState<string | null>(null)
 
   // 1. Current Month Transactions
   const currentMonthTxs = transactions.filter((t) => t.date.startsWith(currentYearMonth))
@@ -65,14 +67,15 @@ export const StatsView: React.FC = () => {
   }
 
   // 4. Category Breakdown & Ranking
-  const categoryMap: { [catId: string]: { amount: number; count: number } } = {}
+  const categoryMap: { [catId: string]: { amount: number; count: number; txs: typeof activeTxs } } = {}
   activeTxs.forEach((tx) => {
     const cid = tx.category_id || 'unknown'
     if (!categoryMap[cid]) {
-      categoryMap[cid] = { amount: 0, count: 0 }
+      categoryMap[cid] = { amount: 0, count: 0, txs: [] }
     }
     categoryMap[cid].amount += tx.amount
     categoryMap[cid].count += 1
+    categoryMap[cid].txs.push(tx)
   })
 
   const filteredTotal = activeTxs.reduce((sum, t) => sum + t.amount, 0)
@@ -81,6 +84,7 @@ export const StatsView: React.FC = () => {
     .map(([catId, meta]) => {
       const cat = categories.find((c) => c.id === catId)
       const percent = filteredTotal > 0 ? (meta.amount / filteredTotal) * 100 : 0
+      const sortedTxs = [...meta.txs].sort((a, b) => b.date.localeCompare(a.date))
       return {
         id: catId,
         name: cat?.name || '기타/미분류',
@@ -88,6 +92,7 @@ export const StatsView: React.FC = () => {
         amount: meta.amount,
         count: meta.count,
         percent,
+        transactions: sortedTxs,
       }
     })
     .sort((a, b) => b.amount - a.amount)
@@ -481,58 +486,141 @@ export const StatsView: React.FC = () => {
             {categoryRanking.map((item, idx) => {
               const color = RANK_COLORS[idx % RANK_COLORS.length]
               const rankNumber = idx + 1
+              const isExpanded = expandedCatId === item.id
 
               return (
-                <div key={item.id} className="space-y-1.5 group">
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      {/* Rank Number Badge */}
-                      <span
-                        className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
-                          rankNumber === 1
-                            ? 'bg-amber-400 text-slate-950 shadow-sm shadow-amber-400/20'
-                            : rankNumber === 2
-                            ? 'bg-slate-300 text-slate-950'
-                            : rankNumber === 3
-                            ? 'bg-amber-700 text-amber-100'
-                            : 'bg-slate-800 text-slate-400 font-normal'
-                        }`}
-                      >
-                        {rankNumber}
-                      </span>
-
-                      <span className="text-lg shrink-0">{item.icon}</span>
-
-                      <div className="truncate">
-                        <span className="font-bold text-slate-200 text-xs truncate">
-                          {item.name}
+                <div
+                  key={item.id}
+                  className={`p-2.5 -mx-1 rounded-2xl border transition-all ${
+                    isExpanded
+                      ? 'bg-[#16181f] border-slate-800 shadow-md'
+                      : 'border-transparent hover:bg-[#16181f]/60 hover:border-slate-850'
+                  }`}
+                >
+                  {/* Category Summary Header (Clickable to Toggle Transaction List) */}
+                  <div
+                    onClick={() => setExpandedCatId(isExpanded ? null : item.id)}
+                    className="space-y-1.5 cursor-pointer select-none"
+                    title="터치하여 이번 달 상세 가계부 내역 보기"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {/* Rank Number Badge */}
+                        <span
+                          className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                            rankNumber === 1
+                              ? 'bg-amber-400 text-slate-950 shadow-sm shadow-amber-400/20'
+                              : rankNumber === 2
+                              ? 'bg-slate-300 text-slate-950'
+                              : rankNumber === 3
+                              ? 'bg-amber-700 text-amber-100'
+                              : 'bg-slate-800 text-slate-400 font-normal'
+                          }`}
+                        >
+                          {rankNumber}
                         </span>
-                        <span className="text-[11px] text-slate-500 ml-1.5">
-                          {item.count}건
+
+                        <span className="text-lg shrink-0">{item.icon}</span>
+
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="font-bold text-slate-200 text-xs truncate">
+                            {item.name}
+                          </span>
+                          <span className="text-[10px] text-slate-400 bg-[#121418] px-1.5 py-0.5 rounded-full border border-slate-800 shrink-0">
+                            {item.count}건
+                          </span>
+                          <ChevronDown
+                            className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+                              isExpanded ? 'rotate-180 text-blue-400' : 'text-slate-500'
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="font-extrabold text-white text-xs">
+                          {formatKRW(item.amount)}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-medium ml-2 font-mono">
+                          {item.percent.toFixed(1)}%
                         </span>
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0">
-                      <span className="font-extrabold text-white text-xs">
-                        {formatKRW(item.amount)}
-                      </span>
-                      <span className="text-[11px] text-slate-400 font-medium ml-2 font-mono">
-                        {item.percent.toFixed(1)}%
-                      </span>
+                    {/* Horizontal Rounded Progress Bar */}
+                    <div className="w-full h-2 bg-[#1a1d24] rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${item.percent}%`,
+                          backgroundColor: color,
+                        }}
+                      />
                     </div>
                   </div>
 
-                  {/* Horizontal Rounded Progress Bar */}
-                  <div className="w-full h-2 bg-[#1a1d24] rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${item.percent}%`,
-                        backgroundColor: color,
-                      }}
-                    />
-                  </div>
+                  {/* Expanded Transaction List (해당 월 카테고리 내역) */}
+                  {isExpanded && (
+                    <div className="mt-3 pt-2.5 border-t border-slate-800/80 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 px-0.5 font-medium">
+                        <span className="text-blue-400 font-semibold flex items-center gap-1">
+                          <span>{parseInt(curMonthNum)}월 {item.name} 상세 내역</span>
+                          <span className="text-slate-500 font-normal">({item.transactions.length}건)</span>
+                        </span>
+                        <span className="text-[10px] text-slate-500">터치 시 바로 수정/삭제</span>
+                      </div>
+
+                      <div className="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
+                        {item.transactions.map((tx) => {
+                          const asset = assets.find((a) => a.id === tx.asset_id)
+                          const [, m, d] = tx.date.split('-')
+
+                          return (
+                            <div
+                              key={tx.id}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openInputModal(tx)
+                              }}
+                              className="flex items-center justify-between p-2.5 bg-[#121418] hover:bg-[#1c202a] active:scale-[0.99] border border-slate-800/90 rounded-xl transition-all cursor-pointer group/tx"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className="text-[10px] font-mono text-slate-400 bg-[#1a1d24] px-1.5 py-0.5 rounded border border-slate-800 shrink-0">
+                                  {m}.{d}
+                                </span>
+                                <div className="truncate">
+                                  <div className="text-xs font-semibold text-slate-200 truncate group-hover/tx:text-white">
+                                    {tx.memo || item.name}
+                                  </div>
+                                  {asset && (
+                                    <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                      <span>{asset.icon}</span>
+                                      <span>{asset.name}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                {tx.image_url && (
+                                  <span className="text-xs text-blue-400" title="영수증 사진 첨부됨">
+                                    📷
+                                  </span>
+                                )}
+                                <span
+                                  className={`text-xs font-bold font-mono ${
+                                    tx.type === 'expense' ? 'text-rose-400' : 'text-emerald-400'
+                                  }`}
+                                >
+                                  {tx.type === 'expense' ? '-' : '+'}{formatKRW(tx.amount)}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}

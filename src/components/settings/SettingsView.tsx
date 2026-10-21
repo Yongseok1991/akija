@@ -36,6 +36,7 @@ export const SettingsView: React.FC = () => {
     exportCSV,
     openCsvModal,
     resetToDefaults,
+    initCloudData,
   } = useAppStore()
 
   // Budget state
@@ -105,12 +106,13 @@ export const SettingsView: React.FC = () => {
     if (supabaseConfig.url && supabaseConfig.anon_key) {
       const ok = await testSupabaseConnection(supabaseConfig.url, supabaseConfig.anon_key)
       if (ok) {
-        setSupabaseStatus('연결 성공! Supabase 동기화가 활성화되었습니다.')
+        setSupabaseStatus('연결 성공! Supabase 클라우드 데이터가 활성화되었습니다.')
+        await initCloudData()
       } else {
         setSupabaseStatus('연결 실패: URL 또는 Anon Key, 테이블 권한(schema.sql)을 확인해 주세요.')
       }
     } else {
-      setSupabaseStatus('Supabase 정보가 저장되었습니다. (로컬 모드)')
+      setSupabaseStatus('Supabase 정보가 저장되었습니다.')
     }
     setIsTestingSupabase(false)
   }
@@ -144,10 +146,10 @@ export const SettingsView: React.FC = () => {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const content = event.target?.result as string
       if (content) {
-        const ok = importDataJSON(content)
+        const ok = await importDataJSON(content)
         if (ok) {
           alert('데이터 복원이 성공적으로 완료되었습니다.')
         } else {
@@ -413,13 +415,13 @@ export const SettingsView: React.FC = () => {
         <div className="pt-2 border-t border-slate-800">
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               if (
                 window.confirm(
-                  '기본 카테고리와 9월 초기 실데이터로 전체 초기화하시겠습니까?'
+                  '모든 가계부 내역과 자산 잔액을 0원으로 완전 초기화하시겠습니까?'
                 )
               ) {
-                resetToDefaults()
+                await resetToDefaults()
                 alert('초기화가 완료되었습니다.')
               }
             }}

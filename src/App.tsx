@@ -12,12 +12,21 @@ import { CsvImportModal } from './components/common/CsvImportModal'
 import { useAppStore } from './store/useAppStore'
 
 export function App() {
-  const { activeTab, syncFromCloud, isCsvModalOpen, closeCsvModal } = useAppStore()
+  const { activeTab, isLoading, initCloudData, isCsvModalOpen, closeCsvModal } = useAppStore()
 
-  // Initial cloud sync attempt on load
+  // 100% Supabase 클라우드 데이터 즉시 로드
   useEffect(() => {
-    syncFromCloud()
-  }, [syncFromCloud])
+    initCloudData()
+  }, [initCloudData])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center justify-center space-y-3 select-none">
+        <div className="w-9 h-9 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs text-slate-400 font-medium">Supabase 클라우드 연결 중...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans select-none antialiased">

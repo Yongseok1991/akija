@@ -14,8 +14,13 @@ import {
   FileText,
   User,
   LogOut,
+  Fingerprint,
+  KeyRound,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
+import { isBiometricAvailable, registerBiometrics, hasRegisteredBiometrics } from '../../utils/webAuthn'
 
 export const SettingsView: React.FC = () => {
   const {
@@ -32,7 +37,63 @@ export const SettingsView: React.FC = () => {
     exportCSV,
     openExcelModal,
     resetToDefaults,
+    changePassword,
   } = useAppStore()
+
+  // Biometric state
+  const [bioAvailable, setBioAvailable] = useState(false)
+  const [bioRegistered, setBioRegistered] = useState(false)
+  const [bioMsg, setBioMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Password change state
+  const [isChangingPw, setIsChangingPw] = useState(false)
+  const [oldPw, setOldPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [pwMsg, setPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  React.useEffect(() => {
+    isBiometricAvailable().then((avail) => {
+      setBioAvailable(avail)
+      setBioRegistered(hasRegisteredBiometrics())
+    })
+  }, [])
+
+  const handleRegisterBiometrics = async () => {
+    setBioMsg(null)
+    const res = await registerBiometrics(user?.username || 'rimbong')
+    if (res.success) {
+      setBioRegistered(true)
+      setBioMsg({ type: 'success', text: '지문이 성공적으로 등록되었습니다! 다음 접속 시 지문으로 열 수 있습니다.' })
+    } else {
+      setBioMsg({ type: 'error', text: res.error || '지문 등록에 실패했습니다.' })
+    }
+  }
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPwMsg(null)
+    if (!oldPw || !newPw) {
+      setPwMsg({ type: 'error', text: '현재 비밀번호와 새 비밀번호를 모두 입력해 주세요.' })
+      return
+    }
+    if (newPw.length < 6) {
+      setPwMsg({ type: 'error', text: '새 비밀번호는 최소 6자 이상이어야 합니다.' })
+      return
+    }
+
+    const res = await changePassword(oldPw, newPw)
+    if (res.success) {
+      setPwMsg({ type: 'success', text: '비밀번호가 성공적으로 변경되었습니다.' })
+      setOldPw('')
+      setNewPw('')
+      setTimeout(() => {
+        setIsChangingPw(false)
+        setPwMsg(null)
+      }, 1500)
+    } else {
+      setPwMsg({ type: 'error', text: res.error || '비밀번호 변경에 실패했습니다.' })
+    }
+  }
 
   // Budget state
   const currentBudgetObj = budgets.find((b) => b.year_month === currentYearMonth)
@@ -115,16 +176,16 @@ export const SettingsView: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* 0. Account & Security Card */}
-      <div className="bg-slate-850/90 border border-slate-750/90 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
+      <div className="bg-[#121418] border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-blue-600/15 border border-blue-500/20 text-blue-400 flex items-center justify-center">
               <User className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs text-slate-400 font-medium">로그인 계정</div>
-              <div className="text-sm font-bold text-slate-100 truncate max-w-[200px]">
-                {user?.email || '비공개 사용자'}
+              <div className="text-xs text-slate-400 font-medium">단독 소유자 계정</div>
+              <div className="text-sm font-bold text-slate-100 font-mono">
+                {user?.username || 'rimbong'}
               </div>
             </div>
           </div>
@@ -132,16 +193,113 @@ export const SettingsView: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              if (window.confirm('로그아웃하시겠습니까? (이 기기에서 다시 로그인해야 합니다)')) {
+              if (window.confirm('가계부를 잠그고 로그아웃하시겠습니까?')) {
                 signOut()
               }
             }}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-rose-500/15 hover:text-rose-400 text-slate-300 border border-slate-700/80 rounded-xl text-xs font-semibold active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#1a1d24] hover:bg-rose-500/15 hover:text-rose-400 text-slate-300 border border-slate-800 rounded-xl text-xs font-semibold active:scale-95 transition-all cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>로그아웃</span>
+            <span>즉시 잠그기</span>
           </button>
         </div>
+
+        {/* Action Buttons: Biometrics & Change Password */}
+        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
+          <button
+            type="button"
+            onClick={handleRegisterBiometrics}
+            disabled={!bioAvailable}
+            title={bioAvailable ? '스마트폰 지문 연동' : '이 기기/브라우저는 지문인식을 지원하지 않습니다'}
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl text-xs font-semibold border transition-all active:scale-98 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+              bioRegistered
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : 'bg-[#1a1d24] border-slate-800 text-slate-300 hover:bg-[#222630]'
+            }`}
+          >
+            <Fingerprint className="w-4 h-4 text-emerald-400" />
+            <span>{bioRegistered ? '지문 등록됨' : bioAvailable ? '지문 등록' : '지문 미지원'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsChangingPw(!isChangingPw)
+              setPwMsg(null)
+            }}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-[#1a1d24] hover:bg-[#222630] border border-slate-800 text-slate-300 rounded-2xl text-xs font-semibold active:scale-98 transition-all cursor-pointer"
+          >
+            <KeyRound className="w-4 h-4 text-blue-400" />
+            <span>비밀번호 변경</span>
+          </button>
+        </div>
+
+        {/* Biometrics Message */}
+        {bioMsg && (
+          <div
+            className={`p-3 rounded-xl text-xs flex items-start gap-2 animate-in fade-in ${
+              bioMsg.type === 'success'
+                ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+            }`}
+          >
+            {bioMsg.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+            ) : (
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+            )}
+            <span>{bioMsg.text}</span>
+          </div>
+        )}
+
+        {/* Change Password Form (Inline Toggle) */}
+        {isChangingPw && (
+          <form onSubmit={handleChangePassword} className="space-y-3 pt-2 border-t border-slate-800/80 animate-in fade-in">
+            <div className="text-xs font-bold text-slate-300">비밀번호 변경</div>
+            <div className="space-y-2">
+              <input
+                type="password"
+                placeholder="현재 비밀번호 입력"
+                value={oldPw}
+                onChange={(e) => setOldPw(e.target.value)}
+                className="w-full px-3 py-2 bg-[#1a1d24] border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+                required
+              />
+              <input
+                type="password"
+                placeholder="새 비밀번호 입력 (6자 이상)"
+                value={newPw}
+                onChange={(e) => setNewPw(e.target.value)}
+                className="w-full px-3 py-2 bg-[#1a1d24] border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+                required
+              />
+            </div>
+
+            {pwMsg && (
+              <div
+                className={`p-2.5 rounded-xl text-xs flex items-center gap-1.5 ${
+                  pwMsg.type === 'success'
+                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                }`}
+              >
+                {pwMsg.type === 'success' ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                )}
+                <span>{pwMsg.text}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 active:scale-98 transition-all cursor-pointer"
+            >
+              새 비밀번호 저장
+            </button>
+          </form>
+        )}
       </div>
 
       {/* 1. Monthly Budget Card */}

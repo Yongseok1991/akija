@@ -1,51 +1,58 @@
-import React, { useState } from 'react'
-import { Lock, Mail, KeyRound, ArrowRight, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Lock, User, KeyRound, ArrowRight, ShieldCheck, AlertCircle, Fingerprint } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
+import { isBiometricAvailable, hasRegisteredBiometrics } from '../../utils/webAuthn'
 
 export const AuthScreen: React.FC = () => {
-  const { signIn, signUp, isLoading } = useAppStore()
+  const { signIn, unlockWithBiometrics, isLoading } = useAppStore()
 
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('rimbong')
   const [password, setPassword] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [canUseBio, setCanUseBio] = useState(false)
+
+  useEffect(() => {
+    async function checkBio() {
+      const available = await isBiometricAvailable()
+      const hasBio = hasRegisteredBiometrics()
+      setCanUseBio(available && hasBio)
+    }
+    checkBio()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg(null)
-    setSuccessMsg(null)
 
-    if (!email.trim() || !password.trim()) {
-      setErrorMsg('이메일과 비밀번호를 모두 입력해 주세요.')
-      return
-    }
-
-    if (password.length < 6) {
-      setErrorMsg('비밀번호는 최소 6자 이상이어야 합니다.')
+    if (!username.trim() || !password.trim()) {
+      setErrorMsg('아이디와 비밀번호를 모두 입력해 주세요.')
       return
     }
 
     setIsSubmitting(true)
-
     try {
-      if (mode === 'signin') {
-        const res = await signIn(email.trim(), password)
-        if (!res.success) {
-          setErrorMsg(res.error || '로그인에 실패했습니다.')
-        }
-      } else {
-        const res = await signUp(email.trim(), password)
-        if (!res.success) {
-          setErrorMsg(res.error || '회원가입에 실패했습니다.')
-        } else if (res.needsConfirmation) {
-          setSuccessMsg(res.error || '가입 확인 메일이 발송되었습니다. 메일함의 확인 링크를 누른 후 로그인해 주세요.')
-          setMode('signin')
-        }
+      const res = await signIn(username.trim(), password)
+      if (!res.success) {
+        setErrorMsg(res.error || '아이디 또는 비밀번호가 일치하지 않습니다.')
       }
     } catch (err: any) {
-      setErrorMsg(err.message || '인증 처리 중 오류가 발생했습니다.')
+      setErrorMsg(err.message || '로그인 처리 중 오류가 발생했습니다.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleBiometricAuth = async () => {
+    setErrorMsg(null)
+    setIsSubmitting(true)
+    try {
+      const res = await unlockWithBiometrics()
+      if (!res.success) {
+        setErrorMsg(res.error || '지문 인증에 실패했습니다.')
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || '지문 인증 중 오류가 발생했습니다.')
     } finally {
       setIsSubmitting(false)
     }
@@ -61,62 +68,34 @@ export const AuthScreen: React.FC = () => {
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight">비공개 스마트가계부</h1>
           <p className="text-xs text-slate-400">
-            주소만으로는 접근할 수 없는 100% 비공개 개인 가계부입니다.
+            소유자만 접근 가능한 100% 비공개 단독 가계부입니다.
           </p>
         </div>
 
         {/* Auth Card */}
-        <div className="bg-slate-850/90 border border-slate-750/90 rounded-3xl p-6 shadow-2xl space-y-5">
-          {/* Signin / Signup Switcher */}
-          <div className="grid grid-cols-2 gap-1 p-1 bg-slate-900/80 rounded-2xl border border-slate-800">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('signin')
-                setErrorMsg(null)
-                setSuccessMsg(null)
-              }}
-              className={`py-2 text-xs font-bold rounded-xl transition-all ${
-                mode === 'signin'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              로그인
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('signup')
-                setErrorMsg(null)
-                setSuccessMsg(null)
-              }}
-              className={`py-2 text-xs font-bold rounded-xl transition-all ${
-                mode === 'signup'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              새 계정 만들기
-            </button>
+        <div className="bg-[#121418] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <span className="text-sm font-bold text-slate-200">보안 로그인</span>
+            <span className="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 font-medium">
+              소유자 전용
+            </span>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-3.5">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                이메일 주소
+                아이디
               </label>
               <div className="relative flex items-center">
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 pointer-events-none" />
+                <User className="w-4 h-4 text-slate-500 absolute left-3.5 pointer-events-none" />
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="예: user@gmail.com"
-                  className="w-full pl-10 pr-3.5 py-3 bg-slate-900/90 border border-slate-750 rounded-2xl text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="소유자 아이디 입력"
+                  className="w-full pl-10 pr-3.5 py-3 bg-[#1a1d24] border border-slate-800 rounded-2xl text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all font-mono"
                   required
-                  autoFocus
                 />
               </div>
             </div>
@@ -131,9 +110,10 @@ export const AuthScreen: React.FC = () => {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="6자리 이상 비밀번호 입력"
-                  className="w-full pl-10 pr-3.5 py-3 bg-slate-900/90 border border-slate-750 rounded-2xl text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all"
+                  placeholder="비밀번호 입력"
+                  className="w-full pl-10 pr-3.5 py-3 bg-[#1a1d24] border border-slate-800 rounded-2xl text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all"
                   required
+                  autoFocus
                 />
               </div>
             </div>
@@ -146,41 +126,46 @@ export const AuthScreen: React.FC = () => {
               </div>
             )}
 
-            {/* Success Message */}
-            {successMsg && (
-              <div className="p-3 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
-                <span>{successMsg}</span>
-              </div>
-            )}
-
             <button
               type="submit"
               disabled={isSubmitting || isLoading}
-              className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white rounded-2xl text-sm font-bold shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white rounded-2xl text-sm font-bold shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting || isLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>{mode === 'signin' ? '내 가계부 열기' : '계정 생성하고 시작하기'}</span>
+                  <span>가계부 열기</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
+
+            {/* Biometric Unlock Option (if registered) */}
+            {canUseBio && (
+              <button
+                type="button"
+                onClick={handleBiometricAuth}
+                disabled={isSubmitting || isLoading}
+                className="w-full py-3 bg-[#1a1d24] hover:bg-[#222630] border border-slate-750 text-slate-200 active:scale-[0.98] rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Fingerprint className="w-4 h-4 text-emerald-400" />
+                <span>지문으로 잠금 해제</span>
+              </button>
+            )}
           </form>
         </div>
 
         {/* Security Features Info Box */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 text-[11px] text-slate-400 space-y-2">
+        <div className="bg-[#121418] border border-slate-800 rounded-2xl p-4 text-[11px] text-slate-400 space-y-2">
           <div className="flex items-center gap-1.5 text-blue-400 font-bold">
             <ShieldCheck className="w-4 h-4" />
-            <span>철저한 개인정보 보호</span>
+            <span>비공개 단독 운영 원칙</span>
           </div>
           <ul className="space-y-1 list-disc list-inside text-slate-400 leading-relaxed">
-            <li>한 번 로그인하면 이 기기에 안전하게 보관되어 매번 로그인할 필요가 없습니다.</li>
-            <li>로그인하지 않은 외부 방문자는 내역을 0건도 조회할 수 없습니다.</li>
-            <li>기존 작성된 엑셀/내역 데이터는 최초 로그인 시 본인 계정으로 자동 귀속됩니다.</li>
+            <li>외부인의 신규 회원가입은 완전히 차단되어 있습니다.</li>
+            <li>로그인하지 않은 방문자는 가계부 데이터를 0건도 조회할 수 없습니다.</li>
+            <li>한 번 로그인하면 이 기기에 안전하게 기억되어 매번 로그인할 필요가 없습니다.</li>
           </ul>
         </div>
       </div>

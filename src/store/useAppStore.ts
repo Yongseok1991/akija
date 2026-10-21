@@ -31,8 +31,10 @@ import {
   supabaseDeleteCategory,
   supabaseUpsertBudget,
   formatSupabaseError,
-  claimUnassignedDataForUser,
+  verifyOwnerCredentials,
+  updateOwnerPassword,
 } from '../lib/supabase'
+import { authenticateWithBiometrics } from '../utils/webAuthn'
 
 // 브라우저 로컬스토리지 잔여 가계부 캐시 완전 삭제 (Supabase 단일 소스 원칙)
 try {
@@ -62,9 +64,10 @@ interface AppState {
   isExcelModalOpen: boolean
   isCsvModalOpen: boolean
   editingTransaction: Transaction | null
-  user: any | null
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  signUp: (email: string, password: string) => Promise<{ success: boolean; needsConfirmation?: boolean; error?: string }>
+  user: { username: string } | null
+  signIn: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
+  unlockWithBiometrics: () => Promise<{ success: boolean; error?: string }>
+  changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>
   signOut: () => Promise<void>
   searchQuery: string
   filterType: 'all' | 'expense' | 'income'
@@ -172,68 +175,67 @@ export const useAppStore = create<AppState>((set, get) => ({
   isSearchOpen: false,
   user: null,
 
-  signIn: async (email, password) => {
-    const sb = getSupabase()
-    if (!sb) return { success: false, error: 'Supabase가 설정되지 않았습니다.' }
-
+  signIn: async (username, password) => {
     set({ isLoading: true })
-    const { data, error } = await sb.auth.signInWithPassword({ email, password })
-    if (error) {
+    const res = await verifyOwnerCredentials(username, password)
+    if (!res.success) {
       set({ isLoading: false })
-      let msg = error.message
-      if (error.message.includes('Invalid login credentials')) {
-        msg = '이메일 또는 비밀번호가 일치하지 않습니다.'
-      } else if (error.message.includes('Email not confirmed')) {
-        msg = '이메일 인증이 필요합니다. 메일함의 확인 링크를 눌러주세요.'
-      }
-      return { success: false, error: msg }
+      return { success: false, error: res.error || '아이디 또는 비밀번호가 일치하지 않습니다.' }
     }
 
-    if (data.user) {
-      set({ user: data.user })
-      await get().initCloudData()
-      return { success: true }
+    const userData = { username: res.username || username.trim() }
+    try {
+      localStorage.setItem('akija_owner_session', JSON.stringify(userData))
+    } catch {
+      // ignore
     }
 
-    set({ isLoading: false })
-    return { success: false, error: '로그인에 실패했습니다.' }
+    set({ user: userData })
+    await get().initCloudData()
+    return { success: true }
   },
 
-  signUp: async (email, password) => {
-    const sb = getSupabase()
-    if (!sb) return { success: false, error: 'Supabase가 설정되지 않았습니다.' }
-
+  unlockWithBiometrics: async () => {
     set({ isLoading: true })
-    const { data, error } = await sb.auth.signUp({ email, password })
-    set({ isLoading: false })
+    const bioRes = await authenticateWithBiometrics()
+    if (!bioRes.success) {
+      set({ isLoading: false })
+      return { success: false, error: bioRes.error }
+    }
 
-    if (error) {
-      let msg = error.message
-      if (error.message.includes('already registered')) {
-        msg = '이미 등록된 이메일입니다. 로그인해 주세요.'
-      } else if (error.message.includes('Password should be at least')) {
-        msg = '비밀번호는 최소 6자 이상이어야 합니다.'
+    let username = 'rimbong'
+    try {
+      const sessionStr = localStorage.getItem('akija_owner_session')
+      if (sessionStr) {
+        username = JSON.parse(sessionStr).username || 'rimbong'
       }
-      return { success: false, error: msg }
+    } catch {
+      // fallback
     }
 
-    if (data.session && data.user) {
-      set({ user: data.user })
-      await get().initCloudData()
-      return { success: true }
+    const userData = { username }
+    try {
+      localStorage.setItem('akija_owner_session', JSON.stringify(userData))
+    } catch {
+      // ignore
     }
 
-    return {
-      success: true,
-      needsConfirmation: true,
-      error: '가입 확인 메일이 발송되었습니다! 메일함의 확인 링크를 누른 후 로그인해 주세요.',
-    }
+    set({ user: userData })
+    await get().initCloudData()
+    return { success: true }
+  },
+
+  changePassword: async (oldPassword, newPassword) => {
+    const user = get().user
+    if (!user) return { success: false, error: '로그인이 필요합니다.' }
+    return await updateOwnerPassword(user.username, oldPassword, newPassword)
   },
 
   signOut: async () => {
-    const sb = getSupabase()
-    if (sb) {
-      await sb.auth.signOut()
+    try {
+      localStorage.removeItem('akija_owner_session')
+    } catch {
+      // ignore
     }
     set({
       user: null,
@@ -275,13 +277,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     try {
-      // 1. 현재 사용자 인증 세션 확인
-      const { data: sessionData } = await sb.auth.getSession()
-      const user = sessionData?.session?.user || null
-      set({ user })
+      // 1. 현재 사용자 인증 세션 확인 (이 기기 로그인 유지)
+      let storedUser = get().user
+      if (!storedUser) {
+        try {
+          const sessionStr = localStorage.getItem('akija_owner_session')
+          if (sessionStr) {
+            storedUser = JSON.parse(sessionStr)
+            set({ user: storedUser })
+          }
+        } catch {
+          storedUser = null
+        }
+      }
 
       // 로그인되지 않은 방문자: 데이터 전혀 로드하지 않고 차단
-      if (!user) {
+      if (!storedUser) {
         set({
           categories: [],
           assets: [],
@@ -293,11 +304,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         return
       }
 
-      // 2. 로그인된 계정으로 기존 미할당(user_id IS NULL) 데이터 자동 귀속
-      await claimUnassignedDataForUser(user.id)
-
-      // 3. 사용자 본인의 데이터만 안전하게 불러오기
-      const data = await supabasePullAll(user.id)
+      // 2. 가계부 데이터 안전하게 로드
+      const data = await supabasePullAll()
       let categories = data?.categories || []
       let assets = data?.assets || []
       const transactions = data?.transactions || []
@@ -308,15 +316,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         const expenseCats: Category[] = DEFAULT_EXPENSE_CATEGORIES.map((c) => ({
           ...c,
           id: generateUUID(),
-          user_id: user.id,
         }))
         const incomeCats: Category[] = DEFAULT_INCOME_CATEGORIES.map((c) => ({
           ...c,
           id: generateUUID(),
-          user_id: user.id,
         }))
         categories = [...expenseCats, ...incomeCats]
-        await supabaseUpsertCategories(categories, user.id)
+        await supabaseUpsertCategories(categories)
       }
 
       // 자산이 없으면 기본 자산 시딩
@@ -325,9 +331,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           ...a,
           id: generateUUID(),
           balance: 0,
-          user_id: user.id,
         }))
-        await supabaseUpsertAssets(assets, user.id)
+        await supabaseUpsertAssets(assets)
       }
 
       set({
@@ -362,8 +367,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const validCatIds = new Set(get().categories.map((c) => c.id))
     const validAssetIds = new Set(get().assets.map((a) => a.id))
-    const user = get().user
-    const userId = user?.id || null
+    const userId = null
 
     // Supabase에 먼저 반영
     const [txRes, assetRes] = await Promise.all([
@@ -415,8 +419,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const validCatIds = new Set(get().categories.map((c) => c.id))
     const validAssetIds = new Set(get().assets.map((a) => a.id))
-    const user = get().user
-    const userId = user?.id || null
+    const userId = null
 
     const [txRes, assetRes] = await Promise.all([
       supabaseUpdateTransaction(updatedTx, validCatIds, validAssetIds, userId),
@@ -473,8 +476,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // 카테고리 관리: Supabase 직접 반영
   addCategory: async (cat) => {
-    const user = get().user
-    const userId = user?.id || null
+    const userId = null
     const newCat: Category = {
       ...cat,
       id: generateUUID(),
@@ -490,8 +492,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateCategory: async (cat) => {
-    const user = get().user
-    const userId = user?.id || null
+    const userId = null
     const nextCats = get().categories.map((c) => (c.id === cat.id ? { ...cat, user_id: userId } : c))
     const res = await supabaseUpsertCategories(nextCats, userId)
     if (!res.success) {
@@ -512,8 +513,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   reorderCategories: async (cats) => {
-    const user = get().user
-    const userId = user?.id || null
+    const userId = null
     const ordered = cats.map((c, idx) => ({ ...c, sort_order: idx + 1, user_id: userId }))
     await supabaseUpsertCategories(ordered, userId)
     set({ categories: ordered })
@@ -521,8 +521,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // 자산 관리: Supabase 직접 반영
   addAsset: async (asset) => {
-    const user = get().user
-    const userId = user?.id || null
+    const userId = null
     const newAsset: Asset = {
       ...asset,
       id: generateUUID(),
@@ -538,8 +537,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateAsset: async (asset) => {
-    const user = get().user
-    const userId = user?.id || null
+    const userId = null
     const nextAssets = get().assets.map((a) => (a.id === asset.id ? { ...asset, user_id: userId } : a))
     const res = await supabaseUpsertAssets(nextAssets, userId)
     if (!res.success) {
@@ -564,8 +562,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // 예산 관리: Supabase 직접 반영
   setBudget: async (yearMonth, amount) => {
-    const user = get().user
-    const userId = user?.id || null
+    const userId = null
     const res = await supabaseUpsertBudget({ year_month: yearMonth, amount, user_id: userId }, userId)
     if (!res.success) {
       alert(`예산 저장 실패: ${formatSupabaseError(res.error)}`)
@@ -619,8 +616,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
     }
 
-    const user = get().user
-    const userId = user?.id || null
+    const userId = null
 
     // 2. 카테고리가 Supabase에 먼저 온전히 반영되도록 업서트 (외래키 제약조건 방지)
     const catUpsertRes = await supabaseUpsertCategories(currentCategories, userId)

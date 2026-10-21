@@ -43,7 +43,7 @@ export function sanitizeTxForDB(
     memo: tx.memo || '',
     image_url: tx.image_url || null,
     created_at: tx.created_at || new Date().toISOString(),
-    ...(tx.user_id || userId ? { user_id: tx.user_id || userId } : {}),
+    ...(isValidUUID(tx.user_id || userId) ? { user_id: tx.user_id || userId } : {}),
   }
 }
 
@@ -54,7 +54,7 @@ export function sanitizeCategoryForDB(c: Category, userId?: string | null): any 
     icon: c.icon || '📌',
     type: c.type || 'expense',
     sort_order: Number(c.sort_order) || 0,
-    ...(c.user_id || userId ? { user_id: c.user_id || userId } : {}),
+    ...(isValidUUID(c.user_id || userId) ? { user_id: c.user_id || userId } : {}),
   }
 }
 
@@ -66,7 +66,7 @@ export function sanitizeAssetForDB(a: Asset, userId?: string | null): any {
     balance: Number(a.balance) || 0,
     icon: a.icon || '💳',
     sort_order: Number(a.sort_order) || 0,
-    ...(a.user_id || userId ? { user_id: a.user_id || userId } : {}),
+    ...(isValidUUID(a.user_id || userId) ? { user_id: a.user_id || userId } : {}),
   }
 }
 
@@ -277,6 +277,90 @@ export async function supabaseUpsertBudget(budget: Budget, userId?: string | nul
   return { success: true }
 }
 
+export const SYSTEM_AUTH_TX_ID = '00000000-0000-0000-0000-000000000000'
+
+export async function hashPasswordWithSalt(password: string, salt: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password + salt)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+export async function verifyOwnerCredentials(
+  usernameInput: string,
+  passwordInput: string
+): Promise<{ success: boolean; username?: string; error?: string }> {
+  const sb = getSupabase()
+  if (!sb) return { success: false, error: '클라우드에 연결할 수 없습니다.' }
+
+  try {
+    const { data, error } = await sb
+      .from('transactions')
+      .select('*')
+      .eq('id', SYSTEM_AUTH_TX_ID)
+      .maybeSingle()
+
+    if (error || !data || !data.image_url) {
+      return { success: false, error: '인증 레코드를 조회할 수 없습니다.' }
+    }
+
+    const authData = JSON.parse(data.image_url)
+    if (authData.username?.toLowerCase() !== usernameInput.trim().toLowerCase()) {
+      return { success: false, error: '아이디 또는 비밀번호가 일치하지 않습니다.' }
+    }
+
+    const computedHash = await hashPasswordWithSalt(passwordInput, authData.salt)
+    if (computedHash !== authData.hash) {
+      return { success: false, error: '아이디 또는 비밀번호가 일치하지 않습니다.' }
+    }
+
+    return { success: true, username: authData.username }
+  } catch (err: any) {
+    return { success: false, error: err.message || '인증 검증 중 오류가 발생했습니다.' }
+  }
+}
+
+export async function updateOwnerPassword(
+  username: string,
+  oldPassword: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  const sb = getSupabase()
+  if (!sb) return { success: false, error: '클라우드에 연결할 수 없습니다.' }
+
+  const verify = await verifyOwnerCredentials(username, oldPassword)
+  if (!verify.success) {
+    return { success: false, error: '기존 비밀번호가 일치하지 않습니다.' }
+  }
+
+  try {
+    const newSalt = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+    const newHash = await hashPasswordWithSalt(newPassword, newSalt)
+
+    const updatedPayload = JSON.stringify({
+      username: username.trim(),
+      salt: newSalt,
+      hash: newHash,
+      updated_at: new Date().toISOString(),
+    })
+
+    const { error } = await sb
+      .from('transactions')
+      .update({ image_url: updatedPayload })
+      .eq('id', SYSTEM_AUTH_TX_ID)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || '비밀번호 변경에 실패했습니다.' }
+  }
+}
+
 export async function supabasePullAll(userId?: string | null) {
   const sb = getSupabase()
   if (!sb) return null
@@ -306,10 +390,14 @@ export async function supabasePullAll(userId?: string | null) {
     if (txRes.error) console.warn('Supabase fetch transactions notice:', txRes.error)
     if (budgetRes.error) console.warn('Supabase fetch budgets notice:', budgetRes.error)
 
+    const rawTxs = (txRes.data as Transaction[] | null) || []
+    // 보안 인증 시스템 레코드는 가계부 내역에서 완전 제외
+    const userTxs = rawTxs.filter((t) => t.id !== SYSTEM_AUTH_TX_ID)
+
     return {
       categories: (catRes.data as Category[] | null) || [],
       assets: (assetRes.data as Asset[] | null) || [],
-      transactions: (txRes.data as Transaction[] | null) || [],
+      transactions: userTxs,
       budgets: (budgetRes.data as Budget[] | null) || [],
     }
   } catch (err) {

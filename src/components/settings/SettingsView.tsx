@@ -326,12 +326,18 @@ export const SettingsView: React.FC = () => {
 
       {/* 4. Supabase Cloud Sync Card */}
       <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-5 shadow-lg space-y-3">
-        <div className="flex items-center gap-2">
-          <Database className="w-4 h-4 text-emerald-400" />
-          <h3 className="font-bold text-slate-100 text-sm">Supabase 클라우드 동기화</h3>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-emerald-400" />
+            <h3 className="font-bold text-slate-100 text-sm">Supabase 클라우드 실시간 자동 저장</h3>
+          </div>
+          <span className="flex items-center gap-1.5 text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>실시간 자동 연동됨</span>
+          </span>
         </div>
         <p className="text-xs text-slate-400">
-          Supabase Project URL과 Anon API Key를 입력하면 클라우드 DB와 실시간 동기화됩니다.
+          가계부 작성, 수정, 삭제, 영수증 사진 업로드 시 별도 동기화 버튼을 누를 필요 없이 **즉시 Supabase 클라우드로 자동 저장**됩니다.
         </p>
 
         <div className="space-y-2">

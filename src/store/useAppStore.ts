@@ -11,11 +11,20 @@ import {
   DEFAULT_EXPENSE_CATEGORIES,
   DEFAULT_INCOME_CATEGORIES,
   DEFAULT_ASSETS,
-  USER_INITIAL_CSV,
 } from '../lib/constants'
 import { getCurrentYearMonth } from '../utils/dateUtils'
-import { parseUserCsvText, exportToUserCsv, type ParsedCsvResult } from '../utils/csvHandler'
-import { syncPullFromSupabase, syncPushToSupabase } from '../lib/supabase'
+import { generateUUID } from '../utils/formatters'
+import { exportToUserCsv, type ParsedCsvResult } from '../utils/csvHandler'
+import {
+  supabasePullAll,
+  supabaseInsertTransaction,
+  supabaseUpdateTransaction,
+  supabaseDeleteTransaction,
+  supabaseUpsertAssets,
+  supabaseUpsertCategories,
+  supabaseDeleteCategory,
+  supabaseUpsertBudget,
+} from '../lib/supabase'
 
 interface AppState {
   categories: Category[]
@@ -26,6 +35,7 @@ interface AppState {
   activeTab: TabType
   isInputModalOpen: boolean
   isCsvModalOpen: boolean
+  isCloudConnected: boolean
   editingTransaction: Transaction | null
 
   // Tab & Modal Navigation
@@ -36,7 +46,7 @@ interface AppState {
   openCsvModal: () => void
   closeCsvModal: () => void
 
-  // Transactions
+  // Transactions (Direct Cloud Sync)
   addTransaction: (tx: Omit<Transaction, 'id' | 'created_at'>) => void
   updateTransaction: (tx: Transaction) => void
   deleteTransaction: (id: string) => void
@@ -59,7 +69,7 @@ interface AppState {
   importParsedCsv: (result: ParsedCsvResult) => void
   exportCSV: () => string
 
-  // Sync & Storage
+  // Auto Cloud Sync & Local Fallback
   syncFromCloud: () => Promise<boolean>
   exportDataJSON: () => string
   importDataJSON: (jsonStr: string) => boolean
@@ -67,10 +77,10 @@ interface AppState {
 }
 
 const STORAGE_KEYS = {
-  CATEGORIES: 'pwa_categories_v2',
-  ASSETS: 'pwa_assets_v2',
-  TRANSACTIONS: 'pwa_transactions_v2',
-  BUDGETS: 'pwa_budgets_v2',
+  CATEGORIES: 'pwa_categories_v3',
+  ASSETS: 'pwa_assets_v3',
+  TRANSACTIONS: 'pwa_transactions_v3',
+  BUDGETS: 'pwa_budgets_v3',
 }
 
 function loadInitialData() {
@@ -89,13 +99,13 @@ function loadInitialData() {
     }
   }
   if (!categories || categories.length === 0) {
-    const expenseCats: Category[] = DEFAULT_EXPENSE_CATEGORIES.map((c, i) => ({
+    const expenseCats: Category[] = DEFAULT_EXPENSE_CATEGORIES.map((c) => ({
       ...c,
-      id: `cat-exp-${i + 1}`,
+      id: generateUUID(),
     }))
-    const incomeCats: Category[] = DEFAULT_INCOME_CATEGORIES.map((c, i) => ({
+    const incomeCats: Category[] = DEFAULT_INCOME_CATEGORIES.map((c) => ({
       ...c,
-      id: `cat-inc-${i + 1}`,
+      id: generateUUID(),
     }))
     categories = [...expenseCats, ...incomeCats]
     localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories))
@@ -111,97 +121,20 @@ function loadInitialData() {
     }
   }
   if (!assets || assets.length === 0) {
-    assets = DEFAULT_ASSETS.map((a, i) => ({
+    assets = DEFAULT_ASSETS.map((a) => ({
       ...a,
-      id: `asset-${i + 1}`,
+      id: generateUUID(),
     }))
     localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(assets))
   }
 
-  // 3. Transactions (Seed with user's actual 2026-09 CSV dataset!)
+  // 3. Transactions
   const savedTx = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)
   if (savedTx) {
     try {
       transactions = JSON.parse(savedTx)
     } catch {
       // fallback
-    }
-  }
-  if (!transactions || transactions.length === 0) {
-    try {
-      const parsed = parseUserCsvText(USER_INITIAL_CSV, categories, assets)
-      transactions = parsed.transactions.map((t, idx) => ({
-        ...t,
-        id: `tx-user-init-${idx + 1}`,
-        created_at: new Date().toISOString(),
-      }))
-
-      // 자산 잔액 업데이트
-      // 10월 최근 내역도 함께 시딩하여 이번 달(10월) 진입 시 바로 표시
-      const currentYM = getCurrentYearMonth()
-      const octTxs: Transaction[] = [
-        {
-          id: 'tx-oct-1',
-          date: `${currentYM}-21`,
-          amount: 8500,
-          type: 'expense',
-          category_id: categories.find((c) => c.name === '식비')?.id || categories[0]?.id,
-          asset_id: assets[0]?.id,
-          memo: '점심 제육덮밥',
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 'tx-oct-2',
-          date: `${currentYM}-21`,
-          amount: 2500,
-          type: 'expense',
-          category_id: categories.find((c) => c.name === '카페/커피')?.id || categories[1]?.id,
-          asset_id: assets[0]?.id,
-          memo: '아이스 아메리카노',
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 'tx-oct-3',
-          date: `${currentYM}-20`,
-          amount: 7600,
-          type: 'expense',
-          category_id: categories.find((c) => c.name === '집술')?.id || categories[3]?.id,
-          asset_id: assets[0]?.id,
-          memo: '생마차 4캔',
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 'tx-oct-4',
-          date: `${currentYM}-15`,
-          amount: 14200,
-          type: 'expense',
-          category_id: categories.find((c) => c.name === '마트/편의점')?.id || categories[2]?.id,
-          asset_id: assets[0]?.id,
-          memo: '물, 제로콜라, 닭가슴살',
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 'tx-oct-5',
-          date: `${currentYM}-10`,
-          amount: 3200000,
-          type: 'income',
-          category_id: categories.find((c) => c.name === '급여')?.id || categories[25]?.id,
-          asset_id: assets.find((a) => a.type === 'bank')?.id || assets[1]?.id,
-          memo: '10월 급여',
-          created_at: new Date().toISOString(),
-        },
-      ]
-
-      transactions = [...octTxs, ...transactions]
-
-      transactions.forEach((tx) => {
-        assets = adjustAssetBalance(assets, tx.type, tx.amount, tx.asset_id, tx.to_asset_id)
-      })
-
-      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions))
-      localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(assets))
-    } catch (e) {
-      console.error('Failed to parse initial user CSV seed:', e)
     }
   }
 
@@ -271,10 +204,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   assets: initialData.assets,
   transactions: initialData.transactions,
   budgets: initialData.budgets,
-  currentYearMonth: getCurrentYearMonth(), // 이번 달 (10월) 자동 시작
+  currentYearMonth: getCurrentYearMonth(), // 항상 이번달 10월로 시작
   activeTab: 'daily',
   isInputModalOpen: false,
   isCsvModalOpen: false,
+  isCloudConnected: true,
   editingTransaction: null,
 
   setActiveTab: (tab) => set({ activeTab: tab }),
@@ -292,10 +226,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   openCsvModal: () => set({ isCsvModalOpen: true }),
   closeCsvModal: () => set({ isCsvModalOpen: false }),
 
+  // 1. 트랜잭션 추가: 즉시 Supabase 클라우드로 자동 전송
   addTransaction: (txData) => {
     const newTx: Transaction = {
       ...txData,
-      id: 'tx-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      id: generateUUID(),
       created_at: new Date().toISOString(),
     }
 
@@ -308,14 +243,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       newTx.to_asset_id
     )
 
+    // 로컬 즉시 반영
     localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(nextTxList))
     localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(nextAssets))
 
     set({ transactions: nextTxList, assets: nextAssets, isInputModalOpen: false, editingTransaction: null })
 
-    syncPushToSupabase({ transactions: [newTx], assets: nextAssets })
+    // Supabase 자동 직접 저장
+    supabaseInsertTransaction(newTx)
+    supabaseUpsertAssets(nextAssets)
   },
 
+  // 2. 트랜잭션 수정: 즉시 Supabase 클라우드로 자동 반영
   updateTransaction: (updatedTx) => {
     const oldTx = get().transactions.find((t) => t.id === updatedTx.id)
     let nextAssets = get().assets
@@ -347,9 +286,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     set({ transactions: nextTxList, assets: nextAssets, isInputModalOpen: false, editingTransaction: null })
 
-    syncPushToSupabase({ transactions: [updatedTx], assets: nextAssets })
+    supabaseUpdateTransaction(updatedTx)
+    supabaseUpsertAssets(nextAssets)
   },
 
+  // 3. 트랜잭션 삭제: 즉시 Supabase 클라우드에서 삭제
   deleteTransaction: (id) => {
     const oldTx = get().transactions.find((t) => t.id === id)
     if (!oldTx) return
@@ -369,61 +310,68 @@ export const useAppStore = create<AppState>((set, get) => ({
     localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(nextAssets))
 
     set({ transactions: nextTxList, assets: nextAssets })
+
+    supabaseDeleteTransaction(id)
+    supabaseUpsertAssets(nextAssets)
   },
 
+  // 카테고리 관리
   addCategory: (cat) => {
     const newCat: Category = {
       ...cat,
-      id: 'cat-' + Date.now(),
+      id: generateUUID(),
     }
     const nextCats = [...get().categories, newCat]
     localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(nextCats))
     set({ categories: nextCats })
-    syncPushToSupabase({ categories: nextCats })
+    supabaseUpsertCategories(nextCats)
   },
 
   updateCategory: (cat) => {
     const nextCats = get().categories.map((c) => (c.id === cat.id ? cat : c))
     localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(nextCats))
     set({ categories: nextCats })
-    syncPushToSupabase({ categories: nextCats })
+    supabaseUpsertCategories(nextCats)
   },
 
   deleteCategory: (id) => {
     const nextCats = get().categories.filter((c) => c.id !== id)
     localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(nextCats))
     set({ categories: nextCats })
+    supabaseDeleteCategory(id)
   },
 
   reorderCategories: (cats) => {
     const ordered = cats.map((c, idx) => ({ ...c, sort_order: idx + 1 }))
     localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(ordered))
     set({ categories: ordered })
-    syncPushToSupabase({ categories: ordered })
+    supabaseUpsertCategories(ordered)
   },
 
+  // 자산 관리
   addAsset: (asset) => {
     const newAsset: Asset = {
       ...asset,
-      id: 'asset-' + Date.now(),
+      id: generateUUID(),
     }
     const nextAssets = [...get().assets, newAsset]
     localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(nextAssets))
     set({ assets: nextAssets })
-    syncPushToSupabase({ assets: nextAssets })
+    supabaseUpsertAssets(nextAssets)
   },
 
   updateAsset: (asset) => {
     const nextAssets = get().assets.map((a) => (a.id === asset.id ? asset : a))
     localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(nextAssets))
     set({ assets: nextAssets })
-    syncPushToSupabase({ assets: nextAssets })
+    supabaseUpsertAssets(nextAssets)
   },
 
   deleteAsset: (id) => {
     const nextAssets = get().assets.filter((a) => a.id !== id)
     localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(nextAssets))
     set({ assets: nextAssets })
+    supabaseUpsertAssets(nextAssets)
   },
 
   setBudget: (yearMonth, amount) => {
@@ -438,7 +386,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(nextBudgets))
     set({ budgets: nextBudgets })
-    syncPushToSupabase({ budgets: nextBudgets })
+    supabaseUpsertBudget({ year_month: yearMonth, amount })
   },
 
   importParsedCsv: (result: ParsedCsvResult) => {
@@ -446,21 +394,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     let currentAssets = [...get().assets]
     let currentTransactions = [...get().transactions]
 
-    // 1. 새 카테고리 추가
     const categoryMapping = new Map<string, string>()
     if (result.newCategories.length > 0) {
       result.newCategories.forEach((nc) => {
-        const newId = 'cat-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6)
+        const newId = generateUUID()
         currentCategories.push({ ...nc, id: newId })
         categoryMapping.set(nc.name, newId)
       })
       localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(currentCategories))
+      supabaseUpsertCategories(currentCategories)
     }
 
-    // 2. 트랜잭션 추가 및 중복 건너뛰기
     const newTxs: Transaction[] = []
     result.transactions.forEach((t) => {
-      // 이미 완전히 동일한 날짜, 금액, 메모가 있는지 검사
       const exists = currentTransactions.some(
         (cur) => cur.date === t.date && cur.amount === t.amount && cur.memo === t.memo
       )
@@ -473,7 +419,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const newTx: Transaction = {
           ...t,
           category_id: catId,
-          id: 'tx-csv-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+          id: generateUUID(),
           created_at: new Date().toISOString(),
         }
         newTxs.push(newTx)
@@ -499,22 +445,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       isCsvModalOpen: false,
     })
 
-    syncPushToSupabase({
-      categories: currentCategories,
-      assets: currentAssets,
-      transactions: newTxs,
-    })
+    // Supabase에 대량 자동 저장
+    newTxs.forEach((tx) => supabaseInsertTransaction(tx))
+    supabaseUpsertAssets(currentAssets)
   },
 
   exportCSV: () => {
     return exportToUserCsv(get().transactions, get().categories, get().assets)
   },
 
+  // 앱 실행 시 Supabase에서 최신 데이터를 자동으로 가져오기
   syncFromCloud: async () => {
-    const data = await syncPullFromSupabase()
+    const data = await supabasePullAll()
     if (!data) return false
 
-    const updates: Partial<AppState> = {}
+    const updates: Partial<AppState> = { isCloudConnected: true }
+
     if (data.categories && data.categories.length > 0) {
       updates.categories = data.categories
       localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(data.categories))

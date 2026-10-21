@@ -9,36 +9,42 @@ export function formatSignedKRW(amount: number, type: 'expense' | 'income' | 'tr
   return formatted
 }
 
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 /**
  * 사칙연산 수식 문자열(예: "5000+3500-1200")을 안전하게 계산
  */
 export function evaluateExpression(expr: string): number {
   if (!expr) return 0
-  // 끝에 있는 연산자 제거 (예: "5000+" -> "5000")
   const sanitized = expr.replace(/[+\-*/.]+$/, '').trim()
   if (!sanitized) return 0
 
-  // 오직 숫자 및 기본 연산자만 허용
   if (!/^[0-9+\-*/.\s]+$/.test(sanitized)) {
     return 0
   }
 
   try {
-    // 안전한 토큰 기반 파서 (Function이나 eval 대신 토크나이저)
-    // 연산자 우선순위: * / 후 + -
     const tokens: (number | string)[] = []
     let numBuffer = ''
 
     for (let i = 0; i < sanitized.length; i++) {
       const char = sanitized[i]
-      if (char >= '0' && char <= '9' || char === '.') {
+      if ((char >= '0' && char <= '9') || char === '.') {
         numBuffer += char
       } else if (['+', '-', '*', '/'].includes(char)) {
         if (numBuffer) {
           tokens.push(parseFloat(numBuffer))
           numBuffer = ''
         } else if (char === '-' && (tokens.length === 0 || typeof tokens[tokens.length - 1] === 'string')) {
-          // 음수 부호 처리
           numBuffer = '-'
           continue
         }
@@ -51,7 +57,6 @@ export function evaluateExpression(expr: string): number {
 
     if (tokens.length === 0) return 0
 
-    // 1차 패스: 곱셈 및 나눗셈
     const intermediate: (number | string)[] = []
     let i = 0
     while (i < tokens.length) {
@@ -67,11 +72,9 @@ export function evaluateExpression(expr: string): number {
         i += 2
       } else {
         intermediate.push(token)
-        i++
       }
     }
 
-    // 2차 패스: 덧셈 및 뺄셈
     let result = intermediate[0] as number
     let j = 1
     while (j < intermediate.length) {

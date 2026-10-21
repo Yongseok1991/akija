@@ -1,11 +1,10 @@
 import React from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw, FileUp } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileUp } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import { formatMonthHeader, getAdjacentYearMonth, getCurrentYearMonth } from '../../utils/dateUtils'
 
 export const Header: React.FC = () => {
-  const { currentYearMonth, setCurrentYearMonth, syncFromCloud, openCsvModal } = useAppStore()
-  const [isSyncing, setIsSyncing] = React.useState(false)
+  const { currentYearMonth, setCurrentYearMonth, openCsvModal, isCloudConnected } = useAppStore()
 
   const isCurrentMonth = currentYearMonth === getCurrentYearMonth()
 
@@ -19,12 +18,6 @@ export const Header: React.FC = () => {
 
   const handleCurrentMonthClick = () => {
     setCurrentYearMonth(getCurrentYearMonth())
-  }
-
-  const handleManualSync = async () => {
-    setIsSyncing(true)
-    await syncFromCloud()
-    setTimeout(() => setIsSyncing(false), 500)
   }
 
   return (
@@ -66,8 +59,15 @@ export const Header: React.FC = () => {
           </button>
         </div>
 
-        {/* Right side quick actions: CSV Import & Sync */}
-        <div className="flex items-center gap-1.5">
+        {/* Right side: CSV Import & Cloud Live Indicator */}
+        <div className="flex items-center gap-2">
+          {isCloudConnected && (
+            <div
+              className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400/50"
+              title="Supabase 클라우드 실시간 자동 저장 중"
+            />
+          )}
+
           <button
             type="button"
             onClick={openCsvModal}
@@ -76,18 +76,6 @@ export const Header: React.FC = () => {
           >
             <FileUp className="w-3.5 h-3.5" />
             <span>CSV</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleManualSync}
-            disabled={isSyncing}
-            className={`p-1.5 text-slate-400 hover:text-blue-400 rounded-full hover:bg-slate-800/80 transition-all ${
-              isSyncing ? 'animate-spin text-blue-400' : ''
-            }`}
-            title="동기화 새로고침"
-          >
-            <RefreshCw className="w-4 h-4" />
           </button>
         </div>
       </div>

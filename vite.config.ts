@@ -10,16 +10,51 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'pwa-192x192.svg'],
+      includeAssets: [
+        'favicon.png',
+        'apple-touch-icon.png',
+        'pwa-192x192.png',
+        'pwa-512x512.png',
+        'pwa-192x192.svg',
+        'pwa-512x512.svg',
+      ],
       manifest: {
+        id: '/akija/',
         name: '초고속 스마트 가계부',
         short_name: '스마트가계부',
         description: '입력 뎁스를 극단적으로 줄인 모바일 최적화 PWA 가계부',
+        start_url: './',
+        scope: './',
+        display: 'standalone',
+        display_override: ['standalone', 'window-controls-overlay', 'minimal-ui'],
+        orientation: 'portrait',
         theme_color: '#0f172a',
         background_color: '#0f172a',
-        display: 'standalone',
-        orientation: 'portrait',
         icons: [
+          {
+            src: 'pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable'
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          },
           {
             src: 'pwa-192x192.svg',
             sizes: '192x192',
@@ -31,6 +66,10 @@ export default defineConfig({
             type: 'image/svg+xml'
           }
         ]
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        cleanupOutdatedCaches: true
       }
     })
   ]

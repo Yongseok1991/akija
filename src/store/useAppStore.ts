@@ -77,10 +77,10 @@ interface AppState {
 }
 
 const STORAGE_KEYS = {
-  CATEGORIES: 'pwa_categories_v3',
-  ASSETS: 'pwa_assets_v3',
-  TRANSACTIONS: 'pwa_transactions_v3',
-  BUDGETS: 'pwa_budgets_v3',
+  CATEGORIES: 'pwa_categories_v5',
+  ASSETS: 'pwa_assets_v5',
+  TRANSACTIONS: 'pwa_transactions_v5',
+  BUDGETS: 'pwa_budgets_v5',
 }
 
 function loadInitialData() {
@@ -89,7 +89,7 @@ function loadInitialData() {
   let transactions: Transaction[] = []
   let budgets: Budget[] = []
 
-  // 1. Categories
+  // 1. Categories (25 기본 카테고리)
   const savedCat = localStorage.getItem(STORAGE_KEYS.CATEGORIES)
   if (savedCat) {
     try {
@@ -111,7 +111,7 @@ function loadInitialData() {
     localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories))
   }
 
-  // 2. Assets
+  // 2. Assets (신용카드, 은행, 현금 0원 시작)
   const savedAssets = localStorage.getItem(STORAGE_KEYS.ASSETS)
   if (savedAssets) {
     try {
@@ -124,11 +124,12 @@ function loadInitialData() {
     assets = DEFAULT_ASSETS.map((a) => ({
       ...a,
       id: generateUUID(),
+      balance: 0,
     }))
     localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(assets))
   }
 
-  // 3. Transactions
+  // 3. Transactions (샘플 없이 깨끗한 빈 상태로 시작)
   const savedTx = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)
   if (savedTx) {
     try {
@@ -136,6 +137,9 @@ function loadInitialData() {
     } catch {
       // fallback
     }
+  } else {
+    transactions = []
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]))
   }
 
   // 4. Budgets
@@ -148,10 +152,7 @@ function loadInitialData() {
     }
   }
   if (!budgets || budgets.length === 0) {
-    budgets = [
-      { year_month: '2026-09', amount: 1500000 },
-      { year_month: getCurrentYearMonth(), amount: 1500000 },
-    ]
+    budgets = [{ year_month: getCurrentYearMonth(), amount: 1500000 }]
     localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(budgets))
   }
 

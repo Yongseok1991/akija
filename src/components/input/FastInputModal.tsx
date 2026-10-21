@@ -8,15 +8,27 @@ import {
   Repeat,
   Camera,
   Image as ImageIcon,
+  Check,
 } from 'lucide-react'
 import type { TransactionType, Category, Asset } from '../../types'
 import { useAppStore } from '../../store/useAppStore'
-import { CustomNumpad } from './CustomNumpad'
 import { CategorySheet } from './CategorySheet'
 import { AssetSheet } from './AssetSheet'
-import { evaluateExpression } from '../../utils/formatters'
 import { getTodayString } from '../../utils/dateUtils'
 import { compressImage } from '../../utils/imageCompressor'
+
+// 숫자로만 추출 후 3자리 콤마 포맷팅
+const formatAmount = (val: string | number) => {
+  const digits = String(val).replace(/[^0-9]/g, '')
+  if (!digits) return ''
+  const num = parseInt(digits, 10)
+  return new Intl.NumberFormat('ko-KR').format(num)
+}
+
+const getRawAmount = (formatted: string) => {
+  const digits = formatted.replace(/[^0-9]/g, '')
+  return digits ? parseInt(digits, 10) : 0
+}
 
 export const FastInputModal: React.FC = () => {
   const {
@@ -31,7 +43,7 @@ export const FastInputModal: React.FC = () => {
 
   // Input states
   const [type, setType] = useState<TransactionType>('expense')
-  const [expression, setExpression] = useState<string>('')
+  const [amountStr, setAmountStr] = useState<string>('')
   const [date, setDate] = useState<string>(getTodayString())
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
@@ -41,7 +53,8 @@ export const FastInputModal: React.FC = () => {
   const [imageSizeKb, setImageSizeKb] = useState<number | null>(null)
   const [isCompressing, setIsCompressing] = useState(false)
 
-  // File input ref
+  // Refs
+  const amountInputRef = useRef<HTMLInputElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const datePickerRef = useRef<HTMLInputElement | null>(null)
 
@@ -56,7 +69,7 @@ export const FastInputModal: React.FC = () => {
       if (editingTransaction) {
         // Edit mode
         setType(editingTransaction.type)
-        setExpression(String(editingTransaction.amount))
+        setAmountStr(formatAmount(editingTransaction.amount))
         setDate(editingTransaction.date)
         setMemo(editingTransaction.memo || '')
         setImageUrl(editingTransaction.image_url || null)
@@ -75,7 +88,7 @@ export const FastInputModal: React.FC = () => {
       } else {
         // Smart Default mode: 오늘 날짜, 지출
         setType('expense')
-        setExpression('')
+        setAmountStr('')
         setDate(getTodayString())
         setMemo('')
         setImageUrl(null)
@@ -90,6 +103,11 @@ export const FastInputModal: React.FC = () => {
         const defaultToAsset = assets.find((a) => a.type === 'bank') || assets[1] || null
         setToAsset(defaultToAsset)
       }
+
+      // 모바일 삼성 키보드 자동 팝업
+      setTimeout(() => {
+        amountInputRef.current?.focus()
+      }, 150)
     }
   }, [isInputModalOpen, editingTransaction])
 
@@ -115,6 +133,20 @@ export const FastInputModal: React.FC = () => {
     }
   }
 
+  // Handle Amount Input Change (삼성 키보드에서 숫자 입력 시 실시간 콤마 적용)
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatAmount(e.target.value)
+    setAmountStr(formatted)
+  }
+
+  // Quick Amount Add (+1만, +5만, +10만, +50만)
+  const handleQuickAdd = (addValue: number) => {
+    const current = getRawAmount(amountStr)
+    const next = current + addValue
+    setAmountStr(formatAmount(next))
+    amountInputRef.current?.focus()
+  }
+
   // Handle Photo selection and ultra-lightweight compression
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -134,46 +166,14 @@ export const FastInputModal: React.FC = () => {
     }
   }
 
-  // Numpad key handlers
-  const handleNumber = (digit: string) => {
-    setExpression((prev) => {
-      if (!prev || prev === '0') {
-        if (digit === '00' || digit === '0') return '0'
-        return digit
-      }
-      return prev + digit
-    })
-  }
-
-  const handleOperator = (op: string) => {
-    setExpression((prev) => {
-      if (!prev) return ''
-      const lastChar = prev.slice(-1)
-      if (['+', '-', '*', '/'].includes(lastChar)) {
-        return prev.slice(0, -1) + op
-      }
-      return prev + op
-    })
-  }
-
-  const handleBackspace = () => {
-    setExpression((prev) => {
-      if (!prev || prev.length <= 1) return ''
-      return prev.slice(0, -1)
-    })
-  }
-
-  const handleClear = () => {
-    setExpression('')
-  }
-
-  const computedAmount = evaluateExpression(expression)
-
   // Submit transaction
-  const handleSubmit = () => {
-    const finalAmount = computedAmount > 0 ? computedAmount : 0
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+
+    const finalAmount = getRawAmount(amountStr)
     if (finalAmount <= 0) {
       alert('0원보다 큰 금액을 입력해 주세요.')
+      amountInputRef.current?.focus()
       return
     }
 
@@ -275,11 +275,17 @@ export const FastInputModal: React.FC = () => {
       />
 
       {/* Main Bottom Sheet Modal */}
-      <div className="relative z-10 w-full max-w-lg mx-auto bg-slate-900 border-t border-slate-800 rounded-t-3xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden pb-safe pointer-events-auto animate-in slide-in-from-bottom-6 duration-200">
+      <div className="relative z-10 w-full max-w-lg mx-auto bg-slate-900 border-t border-slate-800 rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-y-auto no-scrollbar pb-safe pointer-events-auto animate-in slide-in-from-bottom-6 duration-200">
         {/* Top Handle & Close */}
         <div className="flex items-center justify-between px-5 pt-3 pb-1">
           <span className="text-xs font-bold text-slate-400">
-            {editingTransaction ? '가계부 내역 수정' : type === 'income' ? '수입 등록' : type === 'transfer' ? '이체 등록' : '지출 등록'}
+            {editingTransaction
+              ? '가계부 내역 수정'
+              : type === 'income'
+              ? '수입 등록'
+              : type === 'transfer'
+              ? '이체 등록'
+              : '지출 등록'}
           </span>
           <div className="w-10 h-1 bg-slate-700 rounded-full" />
           <button
@@ -292,7 +298,7 @@ export const FastInputModal: React.FC = () => {
         </div>
 
         {/* 1. Transaction Type 3-Tab (지출, 수입, 이체) */}
-        <div className="px-4 py-1">
+        <div className="px-4 py-1.5">
           <div className="grid grid-cols-3 p-1 bg-slate-800/90 rounded-2xl border border-slate-750">
             <button
               type="button"
@@ -333,188 +339,257 @@ export const FastInputModal: React.FC = () => {
           </div>
         </div>
 
-        {/* 2. Amount Live Display (Zero OS Keyboard Read-Only Display) */}
-        <div className="px-4 py-2 text-center bg-slate-950/40 border-y border-slate-800/60 select-none">
-          <div className="text-[11px] text-slate-400 font-mono tracking-wider min-h-[1rem]">
-            {expression ? (
-              <span className="text-blue-400 font-semibold">{expression} {/[+\-]/.test(expression) ? '=' : ''}</span>
-            ) : (
-              <span>금액을 아래 키패드로 입력하세요</span>
-            )}
-          </div>
-          <div className="text-3xl font-black tracking-tight text-slate-100 flex items-center justify-center gap-1 mt-0.5">
-            <span
-              className={
-                type === 'expense'
-                  ? 'text-rose-400'
-                  : type === 'income'
-                  ? 'text-emerald-400'
-                  : 'text-blue-400'
-              }
-            >
-              {type === 'expense' ? '-' : type === 'income' ? '+' : ''}
-            </span>
-            <span>{computedAmount > 0 ? new Intl.NumberFormat('ko-KR').format(computedAmount) : '0'}</span>
-            <span className="text-base font-normal text-slate-400 ml-1">원</span>
-          </div>
-        </div>
+        <form onSubmit={handleSubmit} className="flex flex-col">
+          {/* 2. Native Samsung Keyboard Amount Input Field */}
+          <div className="px-5 py-3 text-center bg-slate-950/40 border-y border-slate-800/60 relative">
+            <div className="text-[11px] text-slate-400 font-medium mb-1">
+              금액 입력 (스마트폰 숫자 키보드)
+            </div>
 
-        {/* 3. Fast Selector Grid (날짜, 카테고리, 결제수단 3분할 그리드) */}
-        <div className="px-4 py-2 space-y-2">
-          <div className="grid grid-cols-3 gap-1.5">
-            {/* Quick Date Picker */}
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  (datePickerRef.current as any)?.showPicker?.() || datePickerRef.current?.click()
-                } catch {
-                  datePickerRef.current?.click()
-                }
-              }}
-              className="flex items-center justify-center gap-1 px-2 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
-              title="날짜 선택"
-            >
-              <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-              <span className="truncate">{formatDateLabel(date)}</span>
-              <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
-            </button>
+            <div className="flex items-center justify-center gap-1.5">
+              <span
+                className={`text-2xl font-black ${
+                  type === 'expense'
+                    ? 'text-rose-400'
+                    : type === 'income'
+                    ? 'text-emerald-400'
+                    : 'text-blue-400'
+                }`}
+              >
+                {type === 'expense' ? '-' : type === 'income' ? '+' : ''}
+              </span>
 
-            {/* Category Button */}
-            {type !== 'transfer' ? (
-              <button
-                type="button"
-                onClick={() => setIsCategorySheetOpen(true)}
-                className="flex items-center justify-center gap-1 px-2 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
-              >
-                <span className="text-sm shrink-0">{selectedCategory?.icon || '🏷️'}</span>
-                <span className="truncate">{selectedCategory?.name || '분류'}</span>
-                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsAssetSheetOpen(true)}
-                className="flex items-center justify-center gap-1 px-2 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
-              >
-                <span className="truncate">{selectedAsset?.name || '출금'}</span>
-                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
-              </button>
-            )}
-
-            {/* Asset Button */}
-            {type !== 'transfer' ? (
-              <button
-                type="button"
-                onClick={() => setIsAssetSheetOpen(true)}
-                className="flex items-center justify-center gap-1 px-2 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
-              >
-                <span className="text-sm shrink-0">{selectedAsset?.icon || '💳'}</span>
-                <span className="truncate">{selectedAsset?.name || '자산'}</span>
-                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsToAssetSheetOpen(true)}
-                className="flex items-center justify-center gap-1 px-2 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
-              >
-                <span className="truncate">{toAsset?.name || '입금'}</span>
-                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
-              </button>
-            )}
-          </div>
-
-          {/* Memo Input Row with Camera Button */}
-          <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 rounded-xl px-3 py-1.5">
-            <input
-              type="text"
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-              placeholder="내용 / 메모 입력 (선택)"
-              className="flex-1 min-w-0 bg-transparent text-slate-100 text-xs focus:outline-none placeholder:text-slate-500 font-medium"
-            />
-            {memo && (
-              <button
-                type="button"
-                onClick={() => setMemo('')}
-                className="p-1 text-slate-400 hover:text-slate-200"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isCompressing}
-              className={`p-1.5 rounded-lg border transition-all shrink-0 ${
-                imageUrl
-                  ? 'bg-blue-600/30 border-blue-500 text-blue-400'
-                  : 'bg-slate-750/80 border-slate-700 text-slate-400 hover:text-slate-200'
-              }`}
-              title="영수증 사진 첨부"
-            >
-              <Camera className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Quick Memo Tags Carousel */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            {QUICK_MEMO_SUGGESTIONS.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => setMemo(memo ? `${memo} ${tag}` : tag)}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700/60 hover:border-slate-600 whitespace-nowrap active:scale-95 transition-all shrink-0"
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-
-          {/* Photo Preview Thumbnail (if attached) */}
-          {imageUrl && (
-            <div className="flex items-center justify-between p-2 bg-slate-800/60 border border-slate-700/60 rounded-xl animate-in fade-in">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-700 relative shrink-0">
-                  <img src={imageUrl} alt="첨부 사진" className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <div className="text-[11px] font-semibold text-slate-200 flex items-center gap-1">
-                    <ImageIcon className="w-3 h-3 text-blue-400" />
-                    <span>영수증 사진 첨부됨</span>
-                  </div>
-                  <div className="text-[10px] text-emerald-400">
-                    초경량 압축 {imageSizeKb ? `(${imageSizeKb}KB)` : ''}
-                  </div>
-                </div>
+              <div className="relative inline-flex items-center justify-center max-w-[280px]">
+                <input
+                  ref={amountInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={amountStr}
+                  onChange={handleAmountChange}
+                  placeholder="0"
+                  className="w-full bg-transparent text-center text-3xl sm:text-4xl font-black tracking-tight text-slate-100 focus:outline-none placeholder:text-slate-600 caret-blue-400"
+                />
               </div>
+
+              <span className="text-xl font-bold text-slate-400">원</span>
+
+              {amountStr && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAmountStr('')
+                    amountInputRef.current?.focus()
+                  }}
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-200 bg-slate-800 ml-1"
+                  title="금액 지우기"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Amount Add Chips (+1만, +5만, +10만, +50만) */}
+            <div className="flex items-center justify-center gap-1.5 mt-2.5">
+              <button
+                type="button"
+                onClick={() => handleQuickAdd(10000)}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700/80 rounded-lg text-xs font-semibold active:scale-95 transition-all"
+              >
+                +1만
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickAdd(50000)}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700/80 rounded-lg text-xs font-semibold active:scale-95 transition-all"
+              >
+                +5만
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickAdd(100000)}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700/80 rounded-lg text-xs font-semibold active:scale-95 transition-all"
+              >
+                +10만
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickAdd(500000)}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700/80 rounded-lg text-xs font-semibold active:scale-95 transition-all"
+              >
+                +50만
+              </button>
+              {amountStr && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAmountStr('')
+                    amountInputRef.current?.focus()
+                  }}
+                  className="px-2 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-semibold active:scale-95 transition-all"
+                >
+                  초기화
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 3. Fast Selector Grid (날짜, 카테고리, 결제수단 3분할 그리드) */}
+          <div className="px-4 py-3 space-y-2.5">
+            <div className="grid grid-cols-3 gap-1.5">
+              {/* Quick Date Picker */}
               <button
                 type="button"
                 onClick={() => {
-                  setImageUrl(null)
-                  setImageSizeKb(null)
+                  try {
+                    (datePickerRef.current as any)?.showPicker?.() || datePickerRef.current?.click()
+                  } catch {
+                    datePickerRef.current?.click()
+                  }
                 }}
-                className="p-1 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-700/50"
-                title="사진 삭제"
+                className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+                title="날짜 선택"
               >
-                <X className="w-3.5 h-3.5" />
+                <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span className="truncate">{formatDateLabel(date)}</span>
+                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+              </button>
+
+              {/* Category Button */}
+              {type !== 'transfer' ? (
+                <button
+                  type="button"
+                  onClick={() => setIsCategorySheetOpen(true)}
+                  className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+                >
+                  <span className="text-sm shrink-0">{selectedCategory?.icon || '🏷️'}</span>
+                  <span className="truncate">{selectedCategory?.name || '분류'}</span>
+                  <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsAssetSheetOpen(true)}
+                  className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+                >
+                  <span className="truncate">{selectedAsset?.name || '출금'}</span>
+                  <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+                </button>
+              )}
+
+              {/* Asset Button */}
+              {type !== 'transfer' ? (
+                <button
+                  type="button"
+                  onClick={() => setIsAssetSheetOpen(true)}
+                  className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+                >
+                  <span className="text-sm shrink-0">{selectedAsset?.icon || '💳'}</span>
+                  <span className="truncate">{selectedAsset?.name || '자산'}</span>
+                  <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsToAssetSheetOpen(true)}
+                  className="flex items-center justify-center gap-1 px-2 py-2.5 bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+                >
+                  <span className="truncate">{toAsset?.name || '입금'}</span>
+                  <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+                </button>
+              )}
+            </div>
+
+            {/* Memo Input Row with Camera Button */}
+            <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-2">
+              <input
+                type="text"
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                placeholder="내용 / 메모 입력 (선택)"
+                className="flex-1 min-w-0 bg-transparent text-slate-100 text-xs focus:outline-none placeholder:text-slate-500 font-medium"
+              />
+              {memo && (
+                <button
+                  type="button"
+                  onClick={() => setMemo('')}
+                  className="p-1 text-slate-400 hover:text-slate-200"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isCompressing}
+                className={`p-1.5 rounded-lg border transition-all shrink-0 ${
+                  imageUrl
+                    ? 'bg-blue-600/30 border-blue-500 text-blue-400'
+                    : 'bg-slate-750/80 border-slate-700 text-slate-400 hover:text-slate-200'
+                }`}
+                title="영수증 사진 첨부"
+              >
+                <Camera className="w-3.5 h-3.5" />
               </button>
             </div>
-          )}
-        </div>
 
-        {/* 4. Custom Virtual Numpad */}
-        <div className="px-3 pb-2 pt-1 bg-slate-950/80 border-t border-slate-800/80">
-          <CustomNumpad
-            onNumber={handleNumber}
-            onOperator={handleOperator}
-            onBackspace={handleBackspace}
-            onClear={handleClear}
-            onSubmit={handleSubmit}
-            submitLabel={editingTransaction ? '수정' : '완료'}
-          />
-        </div>
+            {/* Quick Memo Tags Carousel */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+              {QUICK_MEMO_SUGGESTIONS.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setMemo(memo ? `${memo} ${tag}` : tag)}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700/60 hover:border-slate-600 whitespace-nowrap active:scale-95 transition-all shrink-0"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+
+            {/* Photo Preview Thumbnail (if attached) */}
+            {imageUrl && (
+              <div className="flex items-center justify-between p-2 bg-slate-800/60 border border-slate-700/60 rounded-xl animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-700 relative shrink-0">
+                    <img src={imageUrl} alt="첨부 사진" className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold text-slate-200 flex items-center gap-1">
+                      <ImageIcon className="w-3 h-3 text-blue-400" />
+                      <span>영수증 사진 첨부됨</span>
+                    </div>
+                    <div className="text-[10px] text-emerald-400">
+                      초경량 압축 {imageSizeKb ? `(${imageSizeKb}KB)` : ''}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageUrl(null)
+                    setImageSizeKb(null)
+                  }}
+                  className="p-1 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-700/50"
+                  title="사진 삭제"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 4. Large Primary Submit Button */}
+          <div className="px-4 pt-1 pb-4">
+            <button
+              type="submit"
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm sm:text-base rounded-2xl shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 active:scale-98 transition-all"
+            >
+              <Check className="w-5 h-5 stroke-[2.5]" />
+              <span>{editingTransaction ? '가계부 내역 수정 완료' : '가계부에 저장하기'}</span>
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Category Bottom Sheet */}

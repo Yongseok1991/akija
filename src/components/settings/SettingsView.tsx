@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import {
   Target,
   Layers,
-  Database,
   Download,
   Upload,
   RotateCcw,
@@ -11,16 +10,10 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
-  AlertCircle,
   FileSpreadsheet,
+  FileText,
 } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
-import type { SupabaseConfig } from '../../types'
-import {
-  getSupabaseConfig,
-  saveSupabaseConfig,
-  testSupabaseConnection,
-} from '../../lib/supabase'
 
 export const SettingsView: React.FC = () => {
   const {
@@ -31,13 +24,10 @@ export const SettingsView: React.FC = () => {
     budgets,
     setBudget,
     currentYearMonth,
-    exportDataJSON,
-    importDataJSON,
     exportExcel,
     exportCSV,
     openExcelModal,
     resetToDefaults,
-    initCloudData,
   } = useAppStore()
 
   // Budget state
@@ -51,11 +41,6 @@ export const SettingsView: React.FC = () => {
   const [catTab, setCatTab] = useState<'expense' | 'income'>('expense')
   const [newCatName, setNewCatName] = useState('')
   const [newCatIcon, setNewCatIcon] = useState('')
-
-  // Supabase settings state
-  const [supabaseConfig, setConfig] = useState<SupabaseConfig>(getSupabaseConfig())
-  const [supabaseStatus, setSupabaseStatus] = useState<string | null>(null)
-  const [isTestingSupabase, setIsTestingSupabase] = useState(false)
 
   // Save Budget
   const handleSaveBudget = (e: React.FormEvent) => {
@@ -98,24 +83,16 @@ export const SettingsView: React.FC = () => {
     reorderCategories([...list, ...otherList])
   }
 
-  // Save Supabase Config & Test Connection
-  const handleSaveSupabase = async () => {
-    setIsTestingSupabase(true)
-    setSupabaseStatus(null)
-
-    saveSupabaseConfig(supabaseConfig)
-    if (supabaseConfig.url && supabaseConfig.anon_key) {
-      const ok = await testSupabaseConnection(supabaseConfig.url, supabaseConfig.anon_key)
-      if (ok) {
-        setSupabaseStatus('연결 성공! Supabase 클라우드 데이터가 활성화되었습니다.')
-        await initCloudData()
-      } else {
-        setSupabaseStatus('연결 실패: URL 또는 Anon Key, 테이블 권한(schema.sql)을 확인해 주세요.')
-      }
-    } else {
-      setSupabaseStatus('Supabase 정보가 저장되었습니다.')
-    }
-    setIsTestingSupabase(false)
+  // Export User CSV (11 columns with UTF-8 BOM)
+  const handleExportCSV = () => {
+    const csvContent = exportCSV()
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `가계부_백업_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   // Export Excel (.xlsx)
@@ -124,105 +101,16 @@ export const SettingsView: React.FC = () => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `가계부_${new Date().toISOString().slice(0, 10)}.xlsx`
+    a.download = `가계부_백업_${new Date().toISOString().slice(0, 10)}.xlsx`
     a.click()
     URL.revokeObjectURL(url)
-  }
-
-  // Export User CSV (11 columns with UTF-8 BOM)
-  const handleExportCSV = () => {
-    const csvContent = exportCSV()
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `가계부_${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  // Export JSON
-  const handleExportJSON = () => {
-    const jsonStr = exportDataJSON()
-    const blob = new Blob([jsonStr], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `smart_account_backup_${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  // Import JSON
-  const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = async (event) => {
-      const content = event.target?.result as string
-      if (content) {
-        const ok = await importDataJSON(content)
-        if (ok) {
-          alert('데이터 복원이 성공적으로 완료되었습니다.')
-        } else {
-          alert('유효하지 않은 백업 파일입니다.')
-        }
-      }
-    }
-    reader.readAsText(file)
   }
 
   const filteredCategories = categories.filter((c) => c.type === catTab)
 
   return (
     <div className="space-y-4">
-      {/* 1. Excel Import / Export Card */}
-      <div className="bg-gradient-to-br from-emerald-950/40 via-slate-850 to-slate-900 border border-emerald-500/30 rounded-3xl p-5 shadow-lg space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
-            <h3 className="font-bold text-slate-100 text-sm">가계부 엑셀(Excel) 데이터 관리</h3>
-          </div>
-          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
-            .xlsx 지원
-          </span>
-        </div>
-        <p className="text-xs text-slate-400">
-          편한가계부 및 표준 엑셀 파일(.xlsx, .xls)을 언제든 가져오거나(Import), 현재 가계부 내역을 엑셀 파일로 바로 내보낼 수(Export) 있습니다.
-        </p>
-
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <button
-            type="button"
-            onClick={openExcelModal}
-            className="py-3 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md shadow-emerald-500/20"
-          >
-            <Upload className="w-4 h-4" />
-            <span>엑셀 가져오기 (Import)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            className="py-3 px-3 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all"
-          >
-            <Download className="w-4 h-4 text-emerald-400" />
-            <span>엑셀 내보내기 (.xlsx)</span>
-          </button>
-        </div>
-
-        <div className="flex justify-end pt-0.5">
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="text-[11px] text-slate-400 hover:text-slate-300 underline"
-          >
-            CSV 포맷으로 내보내기
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Monthly Budget Card */}
+      {/* 1. Monthly Budget Card */}
       <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-amber-400" />
@@ -238,93 +126,107 @@ export const SettingsView: React.FC = () => {
               value={budgetInput}
               onChange={(e) => setBudgetInput(e.target.value)}
               placeholder="1,500,000"
-              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-2xl text-slate-100 font-bold text-sm focus:outline-none focus:border-blue-500"
+              className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-blue-500 font-semibold"
             />
-            <span className="absolute right-3.5 top-3 text-xs text-slate-400">원</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">
+              원
+            </span>
           </div>
           <button
             type="submit"
-            className="shrink-0 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-2xl shadow-md active:scale-95 transition-all flex items-center gap-1"
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1 shrink-0"
           >
-            {budgetSuccess ? <Check className="w-4 h-4" /> : null}
-            <span>{budgetSuccess ? '저장됨' : '예산 저장'}</span>
+            {budgetSuccess ? (
+              <>
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>저장됨</span>
+              </>
+            ) : (
+              <span>설정</span>
+            )}
           </button>
         </form>
       </div>
 
-      {/* 3. Category Management */}
+      {/* 2. Category Management Card */}
       <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Layers className="w-4 h-4 text-blue-400 shrink-0" />
-            <h3 className="font-bold text-slate-100 text-sm truncate">카테고리 관리</h3>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-blue-400" />
+            <h3 className="font-bold text-slate-100 text-sm">카테고리 관리 ({categories.length}개)</h3>
           </div>
 
-          <div className="flex bg-slate-800 p-0.5 rounded-xl border border-slate-700 text-xs shrink-0">
+          {/* Type Toggle Tabs */}
+          <div className="flex bg-slate-800 p-0.5 rounded-xl border border-slate-700">
             <button
               type="button"
               onClick={() => setCatTab('expense')}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
-                catTab === 'expense' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                catTab === 'expense'
+                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                  : 'text-slate-400 hover:text-slate-300'
               }`}
             >
-              지출 ({categories.filter((c) => c.type === 'expense').length})
+              지출
             </button>
             <button
               type="button"
               onClick={() => setCatTab('income')}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
-                catTab === 'income' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                catTab === 'income'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'text-slate-400 hover:text-slate-300'
               }`}
             >
-              수입 ({categories.filter((c) => c.type === 'income').length})
+              수입
             </button>
           </div>
         </div>
 
-        {/* Add New Category Form (모바일 가로 짤림 방지: min-w-0, shrink-0 적용) */}
-        <form onSubmit={handleAddCategory} className="flex items-center gap-1.5 pt-1 w-full">
+        {/* Add New Category Form */}
+        <form onSubmit={handleAddCategory} className="flex gap-1.5">
           <input
             type="text"
             value={newCatIcon}
             onChange={(e) => setNewCatIcon(e.target.value)}
-            placeholder="📌"
-            maxLength={2}
-            className="w-12 shrink-0 px-1 py-2 text-center bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-base focus:outline-none focus:border-blue-500 placeholder:text-slate-500"
-            title="이모지 입력"
+            placeholder="이모지"
+            className="w-16 px-2 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs text-center focus:outline-none focus:border-blue-500"
           />
           <input
             type="text"
             value={newCatName}
             onChange={(e) => setNewCatName(e.target.value)}
-            placeholder="새 카테고리 이름"
-            className="flex-1 min-w-0 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-blue-500 placeholder:text-slate-500"
+            placeholder="새 카테고리 이름 입력"
+            className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-blue-500"
           />
           <button
             type="submit"
-            className="shrink-0 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 active:scale-95 transition-all shadow-md shadow-blue-500/20"
+            className="px-3 py-2 bg-slate-800 hover:bg-slate-750 text-blue-400 border border-blue-500/40 rounded-xl text-xs font-bold flex items-center gap-1 active:scale-95 transition-all"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>추가</span>
           </button>
         </form>
 
-        {/* Categories List & Reordering */}
-        <div className="max-h-64 overflow-y-auto divide-y divide-slate-800 pr-1">
+        {/* Category List */}
+        <div className="space-y-1.5 max-h-64 overflow-y-auto no-scrollbar pt-1">
           {filteredCategories.map((cat, idx) => (
-            <div key={cat.id} className="flex items-center justify-between py-2 group gap-2">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="text-lg shrink-0">{cat.icon}</span>
-                <span className="text-xs font-semibold text-slate-200 truncate">{cat.name}</span>
+            <div
+              key={cat.id}
+              className="flex items-center justify-between px-3 py-2 bg-slate-800/60 border border-slate-750 rounded-xl text-xs"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">{cat.icon}</span>
+                <span className="font-semibold text-slate-200">{cat.name}</span>
               </div>
 
-              <div className="flex items-center gap-0.5 shrink-0">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => handleMoveCat(cat.id, 'up')}
                   disabled={idx === 0}
-                  className="p-1 text-slate-400 hover:text-slate-200 disabled:opacity-30"
-                  title="위로"
+                  className="p-1 text-slate-400 hover:text-slate-200 disabled:opacity-20"
+                  title="위로 이동"
                 >
                   <ArrowUp className="w-3.5 h-3.5" />
                 </button>
@@ -332,8 +234,8 @@ export const SettingsView: React.FC = () => {
                   type="button"
                   onClick={() => handleMoveCat(cat.id, 'down')}
                   disabled={idx === filteredCategories.length - 1}
-                  className="p-1 text-slate-400 hover:text-slate-200 disabled:opacity-30"
-                  title="아래로"
+                  className="p-1 text-slate-400 hover:text-slate-200 disabled:opacity-20"
+                  title="아래로 이동"
                 >
                   <ArrowDown className="w-3.5 h-3.5" />
                 </button>
@@ -355,111 +257,78 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Supabase Cloud Sync Card */}
-      <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-5 shadow-lg space-y-3">
+      {/* 3. CSV & Excel Data Backup Card */}
+      <div className="bg-gradient-to-br from-emerald-950/30 via-slate-850 to-slate-900 border border-emerald-500/30 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Database className="w-4 h-4 text-emerald-400" />
-            <h3 className="font-bold text-slate-100 text-sm">Supabase 클라우드 실시간 자동 저장</h3>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <h3 className="font-bold text-slate-100 text-sm">가계부 데이터 백업 & 내보내기</h3>
           </div>
-          <span className="flex items-center gap-1.5 text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>실시간 자동 연동됨</span>
+          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+            CSV / Excel
           </span>
         </div>
         <p className="text-xs text-slate-400">
-          가계부 작성, 수정, 삭제, 영수증 사진 업로드 시 별도 동기화 버튼을 누를 필요 없이 **즉시 Supabase 클라우드로 자동 저장**됩니다.
+          가계부 전체 거래 내역을 표준 CSV 파일 또는 엑셀(.xlsx) 파일로 안전하게 백업 및 복원할 수 있습니다.
         </p>
 
-        <div className="space-y-2">
-          <div>
-            <label className="text-[11px] text-slate-400 block mb-1">Project URL</label>
-            <input
-              type="text"
-              value={supabaseConfig.url}
-              onChange={(e) => setConfig({ ...supabaseConfig, url: e.target.value })}
-              placeholder="https://xyzcompany.supabase.co"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-blue-500 font-mono"
-            />
-          </div>
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="py-3 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md shadow-emerald-500/20"
+          >
+            <Download className="w-4 h-4" />
+            <span>CSV 백업 내보내기</span>
+          </button>
 
-          <div>
-            <label className="text-[11px] text-slate-400 block mb-1">Anon API Key</label>
-            <input
-              type="password"
-              value={supabaseConfig.anon_key}
-              onChange={(e) => setConfig({ ...supabaseConfig, anon_key: e.target.value })}
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-blue-500 font-mono"
-            />
-          </div>
+          <button
+            type="button"
+            onClick={openExcelModal}
+            className="py-3 px-3 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+          >
+            <Upload className="w-4 h-4 text-emerald-400" />
+            <span>백업 불러오기 (CSV/엑셀)</span>
+          </button>
+        </div>
 
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={handleSaveSupabase}
-              disabled={isTestingSupabase}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md active:scale-98 transition-all flex items-center justify-center gap-1.5"
-            >
-              {isTestingSupabase ? '연결 테스트 중...' : '설정 저장 및 연결 테스트'}
-            </button>
-          </div>
-
-          {supabaseStatus && (
-            <div
-              className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
-                supabaseStatus.includes('성공')
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-              }`}
-            >
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{supabaseStatus}</span>
-            </div>
-          )}
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-[11px] text-slate-400">엑셀 원본 서식 파일로 보관하고 싶다면:</span>
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1"
+          >
+            <FileText className="w-3 h-3" />
+            <span>.xlsx 파일로 다운로드</span>
+          </button>
         </div>
       </div>
 
-      {/* 5. JSON Backup & Reset */}
-      <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-5 shadow-lg space-y-3">
-        <h3 className="font-bold text-slate-100 text-sm">JSON 백업 및 전체 리셋</h3>
+      {/* 4. Complete Reset Card */}
+      <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
+        <h3 className="font-bold text-slate-100 text-sm">데이터 초기화</h3>
+        <p className="text-xs text-slate-400">
+          가계부를 처음부터 다시 시작하려면 전체 거래 내역과 자산 잔액을 0원으로 초기화할 수 있습니다.
+        </p>
 
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={handleExportJSON}
-            className="py-2.5 px-3 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-all"
-          >
-            <Download className="w-4 h-4 text-blue-400" />
-            <span>JSON 백업 내보내기</span>
-          </button>
-
-          <label className="py-2.5 px-3 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer">
-            <Upload className="w-4 h-4 text-emerald-400" />
-            <span>JSON 백업 가져오기</span>
-            <input type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
-          </label>
-        </div>
-
-        <div className="pt-2 border-t border-slate-800">
-          <button
-            type="button"
-            onClick={async () => {
-              if (
-                window.confirm(
-                  '모든 가계부 내역과 자산 잔액을 0원으로 완전 초기화하시겠습니까?'
-                )
-              ) {
-                await resetToDefaults()
-                alert('초기화가 완료되었습니다.')
-              }
-            }}
-            className="w-full py-2.5 text-rose-400 hover:bg-rose-500/10 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>초기 기본값으로 리셋</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={async () => {
+            if (
+              window.confirm(
+                '모든 가계부 거래 내역과 자산 잔액을 0원으로 완전 초기화하시겠습니까?\n(사전에 CSV 백업을 권장합니다)'
+              )
+            ) {
+              await resetToDefaults()
+              alert('모든 데이터가 초기화되었습니다.')
+            }
+          }}
+          className="w-full py-2.5 text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all active:scale-98"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span>가계부 전체 내역 리셋</span>
+        </button>
       </div>
     </div>
   )

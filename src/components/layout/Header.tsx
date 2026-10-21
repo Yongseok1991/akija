@@ -4,7 +4,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { formatMonthHeader, getAdjacentYearMonth, getCurrentYearMonth } from '../../utils/dateUtils'
 
 export const Header: React.FC = () => {
-  const { currentYearMonth, setCurrentYearMonth, openExcelModal, isCloudConnected } = useAppStore()
+  const { currentYearMonth, setCurrentYearMonth, openExcelModal } = useAppStore()
 
   const isCurrentMonth = currentYearMonth === getCurrentYearMonth()
 
@@ -59,20 +59,13 @@ export const Header: React.FC = () => {
           </button>
         </div>
 
-        {/* Right side: CSV Import & Cloud Live Indicator */}
+        {/* Right side: Excel Import Modal Trigger */}
         <div className="flex items-center gap-2">
-          {isCloudConnected && (
-            <div
-              className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400/50"
-              title="Supabase 클라우드 실시간 자동 저장 중"
-            />
-          )}
-
           <button
             type="button"
             onClick={openExcelModal}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold active:scale-95 transition-all"
-            title="엑셀 데이터 가져오기 (.xlsx, .xls)"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold active:scale-95 transition-all cursor-pointer"
+            title="엑셀 / CSV 데이터 가져오기 (.xlsx, .csv)"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>엑셀</span>

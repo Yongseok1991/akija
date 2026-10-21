@@ -3,7 +3,6 @@ import {
   X,
   Calendar,
   ChevronDown,
-  ArrowRight,
   TrendingDown,
   TrendingUp,
   Repeat,
@@ -15,7 +14,6 @@ import { useAppStore } from '../../store/useAppStore'
 import { CustomNumpad } from './CustomNumpad'
 import { CategorySheet } from './CategorySheet'
 import { AssetSheet } from './AssetSheet'
-import { QuickMemoTags } from './QuickMemoTags'
 import { evaluateExpression } from '../../utils/formatters'
 import { getTodayString } from '../../utils/dateUtils'
 import { compressImage } from '../../utils/imageCompressor'
@@ -45,12 +43,12 @@ export const FastInputModal: React.FC = () => {
 
   // File input ref
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const datePickerRef = useRef<HTMLInputElement | null>(null)
 
   // Bottom sheet triggers
   const [isCategorySheetOpen, setIsCategorySheetOpen] = useState(false)
   const [isAssetSheetOpen, setIsAssetSheetOpen] = useState(false)
   const [isToAssetSheetOpen, setIsToAssetSheetOpen] = useState(false)
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
 
   // Initialize or reset on open
   useEffect(() => {
@@ -214,10 +212,35 @@ export const FastInputModal: React.FC = () => {
     }
   }
 
-  const todayStr = getTodayString()
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate() - 1)
-  const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`
+  const formatDateLabel = (d: string) => {
+    const today = getTodayString()
+    if (d === today) {
+      const parts = d.split('-')
+      return `오늘 (${parseInt(parts[1])}/${parseInt(parts[2])})`
+    }
+    const yest = new Date()
+    yest.setDate(yest.getDate() - 1)
+    const yestStr = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, '0')}-${String(yest.getDate()).padStart(2, '0')}`
+    if (d === yestStr) {
+      const parts = d.split('-')
+      return `어제 (${parseInt(parts[1])}/${parseInt(parts[2])})`
+    }
+    const parts = d.split('-')
+    return `${parseInt(parts[1])}/${parseInt(parts[2])}`
+  }
+
+  const QUICK_MEMO_SUGGESTIONS = [
+    '점심',
+    '저녁',
+    '커피',
+    '마트',
+    '편의점',
+    '술',
+    '배달',
+    '생활용품',
+    '주유',
+    '쇼핑',
+  ]
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col justify-end">
@@ -236,72 +259,84 @@ export const FastInputModal: React.FC = () => {
         className="hidden"
       />
 
+      {/* Hidden Native Date Input */}
+      <input
+        type="date"
+        ref={datePickerRef}
+        value={date}
+        onChange={(e) => setDate(e.target.value)}
+        className="sr-only absolute"
+      />
+
       {/* Main Bottom Sheet Modal */}
-      <div className="relative z-10 w-full max-w-lg mx-auto bg-slate-900 border-t border-slate-800 rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[96vh] pb-safe">
+      <div className="relative z-10 w-full max-w-lg mx-auto bg-slate-900 border-t border-slate-800 rounded-t-3xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden pb-safe animate-in slide-in-from-bottom-6 duration-200">
         {/* Top Handle & Close */}
-        <div className="flex items-center justify-between px-6 pt-3 pb-1">
-          <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto" />
+        <div className="flex items-center justify-between px-5 pt-3 pb-1">
+          <span className="text-xs font-bold text-slate-400">
+            {editingTransaction ? '가계부 내역 수정' : type === 'income' ? '수입 등록' : type === 'transfer' ? '이체 등록' : '지출 등록'}
+          </span>
+          <div className="w-10 h-1 bg-slate-700 rounded-full" />
           <button
             type="button"
             onClick={closeInputModal}
-            className="absolute right-4 top-3 p-2 text-slate-400 hover:text-slate-200 rounded-full hover:bg-slate-800"
+            className="p-1.5 text-slate-400 hover:text-slate-200 rounded-full hover:bg-slate-800 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* 1. Transaction Type 3-Tab (지출, 수입, 이체) */}
-        <div className="px-5 pt-1 pb-2">
+        <div className="px-4 py-1">
           <div className="grid grid-cols-3 p-1 bg-slate-800/90 rounded-2xl border border-slate-750">
             <button
               type="button"
               onClick={() => handleTypeChange('expense')}
-              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-2 rounded-xl font-bold text-xs transition-all ${
                 type === 'expense'
                   ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 shadow-sm'
                   : 'text-slate-400 hover:text-slate-300'
               }`}
             >
-              <TrendingDown className="w-4 h-4" />
+              <TrendingDown className="w-3.5 h-3.5" />
               <span>지출</span>
             </button>
             <button
               type="button"
               onClick={() => handleTypeChange('income')}
-              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-2 rounded-xl font-bold text-xs transition-all ${
                 type === 'income'
                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-sm'
                   : 'text-slate-400 hover:text-slate-300'
               }`}
             >
-              <TrendingUp className="w-4 h-4" />
+              <TrendingUp className="w-3.5 h-3.5" />
               <span>수입</span>
             </button>
             <button
               type="button"
               onClick={() => handleTypeChange('transfer')}
-              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-2 rounded-xl font-bold text-xs transition-all ${
                 type === 'transfer'
                   ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50 shadow-sm'
                   : 'text-slate-400 hover:text-slate-300'
               }`}
             >
-              <Repeat className="w-4 h-4" />
+              <Repeat className="w-3.5 h-3.5" />
               <span>이체</span>
             </button>
           </div>
         </div>
 
         {/* 2. Amount Live Display (Zero OS Keyboard Read-Only Display) */}
-        <div className="px-6 py-2.5 text-center bg-slate-950/40 border-y border-slate-800/60">
-          <div className="text-xs text-slate-400 font-mono tracking-wider min-h-[1.2rem]">
+        <div className="px-4 py-2 text-center bg-slate-950/40 border-y border-slate-800/60">
+          <div className="text-[11px] text-slate-400 font-mono tracking-wider min-h-[1rem]">
             {expression && /[+\-]/.test(expression) ? (
               <span className="text-blue-400 font-semibold">{expression} =</span>
             ) : (
-              <span>금액을 입력하세요</span>
+              <span>금액을 키패드로 입력하세요</span>
             )}
           </div>
-          <div className="text-3xl sm:text-4xl font-black tracking-tight text-slate-100 flex items-center justify-center gap-1 mt-0.5">
+          <div className="text-3xl font-black tracking-tight text-slate-100 flex items-center justify-center gap-1 mt-0.5">
             <span
               className={
                 type === 'expense'
@@ -314,70 +349,50 @@ export const FastInputModal: React.FC = () => {
               {type === 'expense' ? '-' : type === 'income' ? '+' : ''}
             </span>
             <span>{computedAmount > 0 ? new Intl.NumberFormat('ko-KR').format(computedAmount) : '0'}</span>
-            <span className="text-lg font-normal text-slate-400 ml-1">원</span>
+            <span className="text-base font-normal text-slate-400 ml-1">원</span>
           </div>
         </div>
 
-        {/* 3. Fast Selector Row (날짜, 카테고리, 결제수단, 사진) */}
-        <div className="px-5 py-2.5 space-y-2">
-          <div className="flex items-center gap-2">
+        {/* 3. Fast Selector Grid (날짜, 카테고리, 결제수단 3분할 그리드) */}
+        <div className="px-4 py-2 space-y-2">
+          <div className="grid grid-cols-3 gap-1.5">
             {/* Quick Date Picker */}
-            <div className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 text-xs">
-              <button
-                type="button"
-                onClick={() => setDate(todayStr)}
-                className={`px-2.5 py-1.5 rounded-lg font-medium transition-all ${
-                  date === todayStr ? 'bg-blue-600 text-white font-bold' : 'text-slate-400'
-                }`}
-              >
-                오늘
-              </button>
-              <button
-                type="button"
-                onClick={() => setDate(yesterdayStr)}
-                className={`px-2.5 py-1.5 rounded-lg font-medium transition-all ${
-                  date === yesterdayStr ? 'bg-blue-600 text-white font-bold' : 'text-slate-400'
-                }`}
-              >
-                어제
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                className="px-2 py-1.5 text-slate-400 hover:text-slate-200"
-                title="날짜 선택"
-              >
-                <Calendar className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Date Picker Native fallback inline without keyboard */}
-            {isDatePickerOpen && (
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => {
-                  setDate(e.target.value)
-                  setIsDatePickerOpen(false)
-                }}
-                className="text-xs bg-slate-800 border border-slate-700 rounded-xl px-2 py-1 text-slate-200 focus:outline-none"
-              />
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  (datePickerRef.current as any)?.showPicker?.() || datePickerRef.current?.click()
+                } catch {
+                  datePickerRef.current?.click()
+                }
+              }}
+              className="flex items-center justify-center gap-1 px-2 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+              title="날짜 선택"
+            >
+              <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span className="truncate">{formatDateLabel(date)}</span>
+              <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+            </button>
 
             {/* Category Button */}
-            {type !== 'transfer' && (
+            {type !== 'transfer' ? (
               <button
                 type="button"
                 onClick={() => setIsCategorySheetOpen(true)}
-                className="flex-1 flex items-center justify-between px-3 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs active:scale-95 transition-all truncate"
+                className="flex items-center justify-center gap-1 px-2 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
               >
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="text-base">{selectedCategory?.icon || '🏷️'}</span>
-                  <span className="font-semibold text-slate-200 truncate">
-                    {selectedCategory?.name || '분류'}
-                  </span>
-                </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
+                <span className="text-sm shrink-0">{selectedCategory?.icon || '🏷️'}</span>
+                <span className="truncate">{selectedCategory?.name || '분류'}</span>
+                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsAssetSheetOpen(true)}
+                className="flex items-center justify-center gap-1 px-2 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+              >
+                <span className="truncate">{selectedAsset?.name || '출금'}</span>
+                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
               </button>
             )}
 
@@ -386,69 +401,85 @@ export const FastInputModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsAssetSheetOpen(true)}
-                className="flex-1 flex items-center justify-between px-3 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs active:scale-95 transition-all truncate"
+                className="flex items-center justify-center gap-1 px-2 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
               >
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="text-base">{selectedAsset?.icon || '💳'}</span>
-                  <span className="font-semibold text-slate-200 truncate">
-                    {selectedAsset?.name || '결제수단'}
-                  </span>
-                </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
+                <span className="text-sm shrink-0">{selectedAsset?.icon || '💳'}</span>
+                <span className="truncate">{selectedAsset?.name || '자산'}</span>
+                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
               </button>
             ) : (
-              // Transfer
-              <div className="flex-1 flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setIsAssetSheetOpen(true)}
-                  className="flex-1 flex items-center justify-between px-2.5 py-2 bg-slate-800/80 border border-slate-700/60 rounded-xl text-xs truncate"
-                >
-                  <span className="truncate">{selectedAsset?.name || '출금'}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
-                </button>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <button
-                  type="button"
-                  onClick={() => setIsToAssetSheetOpen(true)}
-                  className="flex-1 flex items-center justify-between px-2.5 py-2 bg-slate-800/80 border border-slate-700/60 rounded-xl text-xs truncate"
-                >
-                  <span className="truncate">{toAsset?.name || '입금'}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsToAssetSheetOpen(true)}
+                className="flex items-center justify-center gap-1 px-2 py-2 bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+              >
+                <span className="truncate">{toAsset?.name || '입금'}</span>
+                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+              </button>
             )}
+          </div>
 
-            {/* Photo Attachment Button */}
+          {/* Memo Input Row with Camera Button */}
+          <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 rounded-xl px-3 py-1.5">
+            <input
+              type="text"
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="내용 / 메모 입력 (선택)"
+              className="flex-1 min-w-0 bg-transparent text-slate-100 text-xs focus:outline-none placeholder:text-slate-500 font-medium"
+            />
+            {memo && (
+              <button
+                type="button"
+                onClick={() => setMemo('')}
+                className="p-1 text-slate-400 hover:text-slate-200"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isCompressing}
-              className={`p-2 rounded-xl border flex items-center justify-center transition-all ${
+              className={`p-1.5 rounded-lg border transition-all shrink-0 ${
                 imageUrl
-                  ? 'bg-blue-600/20 border-blue-500 text-blue-400'
-                  : 'bg-slate-800/80 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600/30 border-blue-500 text-blue-400'
+                  : 'bg-slate-750/80 border-slate-700 text-slate-400 hover:text-slate-200'
               }`}
-              title="영수증/소비 사진 첨부"
+              title="영수증 사진 첨부"
             >
-              <Camera className="w-4 h-4" />
+              <Camera className="w-3.5 h-3.5" />
             </button>
+          </div>
+
+          {/* Quick Memo Tags Carousel */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+            {QUICK_MEMO_SUGGESTIONS.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setMemo(memo ? `${memo} ${tag}` : tag)}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700/60 hover:border-slate-600 whitespace-nowrap active:scale-95 transition-all shrink-0"
+              >
+                {tag}
+              </button>
+            ))}
           </div>
 
           {/* Photo Preview Thumbnail (if attached) */}
           {imageUrl && (
-            <div className="flex items-center justify-between p-2 bg-slate-800/60 border border-slate-700/60 rounded-2xl animate-in fade-in">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl overflow-hidden border border-slate-700 relative shrink-0">
+            <div className="flex items-center justify-between p-2 bg-slate-800/60 border border-slate-700/60 rounded-xl animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-700 relative shrink-0">
                   <img src={imageUrl} alt="첨부 사진" className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-200 flex items-center gap-1">
-                    <ImageIcon className="w-3.5 h-3.5 text-blue-400" />
+                  <div className="text-[11px] font-semibold text-slate-200 flex items-center gap-1">
+                    <ImageIcon className="w-3 h-3 text-blue-400" />
                     <span>영수증 사진 첨부됨</span>
                   </div>
-                  <div className="text-[10px] text-emerald-400 mt-0.5">
-                    초경량 압축 완료 {imageSizeKb ? `(${imageSizeKb}KB)` : ''}
+                  <div className="text-[10px] text-emerald-400">
+                    초경량 압축 {imageSizeKb ? `(${imageSizeKb}KB)` : ''}
                   </div>
                 </div>
               </div>
@@ -458,27 +489,24 @@ export const FastInputModal: React.FC = () => {
                   setImageUrl(null)
                   setImageSizeKb(null)
                 }}
-                className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-700/50"
+                className="p-1 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-700/50"
                 title="사진 삭제"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
-
-          {/* Quick Memo Chips */}
-          <QuickMemoTags currentMemo={memo} onSelectMemo={(m) => setMemo(m)} />
         </div>
 
         {/* 4. Custom Virtual Numpad */}
-        <div className="px-3 pb-2 pt-1 bg-slate-950/70 border-t border-slate-800/80">
+        <div className="px-3 pb-2 pt-1 bg-slate-950/80 border-t border-slate-800/80">
           <CustomNumpad
             onNumber={handleNumber}
             onOperator={handleOperator}
             onBackspace={handleBackspace}
             onClear={handleClear}
             onSubmit={handleSubmit}
-            submitLabel={editingTransaction ? '수정완료' : '입력완료'}
+            submitLabel={editingTransaction ? '수정' : '완료'}
           />
         </div>
       </div>

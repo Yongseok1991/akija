@@ -50,14 +50,15 @@ CREATE TABLE IF NOT EXISTS budgets (
     UNIQUE(user_id, year_month)
 );
 
--- Row Level Security (RLS) 활성화
-ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
-ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE budgets ENABLE ROW LEVEL SECURITY;
+-- 개인 가계부용 RLS 비활성화 (로그인 세션 없이 누구나 내 가계부 데이터 안전하게 CRUD)
+ALTER TABLE public.categories DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.assets DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.budgets DISABLE ROW LEVEL SECURITY;
 
--- 1인 사용 / 개인 가계부용 접근 허용 정책
-CREATE POLICY "Allow access to categories" ON categories FOR ALL USING (true);
-CREATE POLICY "Allow access to assets" ON assets FOR ALL USING (true);
-CREATE POLICY "Allow access to transactions" ON transactions FOR ALL USING (true);
-CREATE POLICY "Allow access to budgets" ON budgets FOR ALL USING (true);
+-- 만약 RLS를 활성화하고 싶을 경우:
+-- ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY "Allow all on categories" ON public.categories FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "Allow all on assets" ON public.assets FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "Allow all on transactions" ON public.transactions FOR ALL USING (true) WITH CHECK (true);
+-- CREATE POLICY "Allow all on budgets" ON public.budgets FOR ALL USING (true) WITH CHECK (true);

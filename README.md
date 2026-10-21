@@ -1,4 +1,4 @@
-# 📱 초고속 스마트 가계부 (Smart Household Account Book PWA)
+# 📱 스마트가계부 (Smart Household Account Book PWA)
 
 매일 1회 수동 입력 패턴에 맞춰, **입력 뎁스(Depth)를 극단적으로 단축하고 모바일 OS 가상 키보드 간섭을 원천 차단**한 개인용 PWA 가계부입니다.
 

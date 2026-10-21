@@ -20,7 +20,7 @@ export default defineConfig({
       ],
       manifest: {
         id: '/akija/',
-        name: '초고속 스마트 가계부',
+        name: '스마트가계부',
         short_name: '스마트가계부',
         description: '입력 뎁스를 극단적으로 줄인 모바일 최적화 PWA 가계부',
         start_url: './',

@@ -37,7 +37,7 @@ export const DEFAULT_INCOME_CATEGORIES: Omit<Category, 'id'>[] = [
 ]
 
 export const DEFAULT_ASSETS: Omit<Asset, 'id'>[] = [
-  { name: '메인 신용카드', type: 'card', balance: 0, icon: '💳', sort_order: 1 },
+  { name: '신용/체크카드', type: 'card', balance: 0, icon: '💳', sort_order: 1 },
   { name: '주거래 은행', type: 'bank', balance: 0, icon: '🏦', sort_order: 2 },
   { name: '지갑 현금', type: 'cash', balance: 0, icon: '💵', sort_order: 3 },
 ]

@@ -1,16 +1,62 @@
-export function getTodayString(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+/**
+ * 한국 표준시 (KST / Asia/Seoul, UTC+9) 기준 날짜 및 시간 유틸리티
+ */
+
+export function getTodayString(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+
+  const getPart = (type: string) => parts.find((p) => p.type === type)?.value || '00'
+  return `${getPart('year')}-${getPart('month')}-${getPart('day')}`
 }
 
-export function getCurrentYearMonth(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  return `${year}-${month}`
+export function getCurrentYearMonth(date: Date = new Date()): string {
+  return getTodayString(date).slice(0, 7)
+}
+
+/**
+ * Supabase DB 및 로컬 저장 시 한국시간(KST) 그대로 저장되도록 하는 포맷터
+ * YYYY-MM-DD HH:mm:ss.SSS (KST)
+ */
+export function getKoreanNowString(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date)
+
+  const getPart = (type: string) => parts.find((p) => p.type === type)?.value || '00'
+  const ms = String(date.getMilliseconds()).padStart(3, '0')
+  return `${getPart('year')}-${getPart('month')}-${getPart('day')} ${getPart('hour')}:${getPart('minute')}:${getPart('second')}.${ms}`
+}
+
+/**
+ * 거래 생성 시각(created_at)을 한국시간 기준 오전/오후 HH:mm으로 표시
+ */
+export function formatKoreanTime(created_at?: string): string {
+  if (!created_at) return ''
+  try {
+    const normalized = created_at.includes('T') ? created_at : created_at.replace(' ', 'T')
+    const d = new Date(normalized)
+    if (isNaN(d.getTime())) return ''
+    return new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(d)
+  } catch {
+    return ''
+  }
 }
 
 export function formatKoreanDate(dateStr: string): string {
@@ -37,9 +83,10 @@ export function formatGroupDate(dateStr: string): string {
       return `${d}일 오늘`
     }
 
-    const yest = new Date()
+    const nowKst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
+    const yest = new Date(nowKst)
     yest.setDate(yest.getDate() - 1)
-    const yestStr = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, '0')}-${String(yest.getDate()).padStart(2, '0')}`
+    const yestStr = getTodayString(yest)
     if (dateStr === yestStr) {
       return `${d}일 어제`
     }

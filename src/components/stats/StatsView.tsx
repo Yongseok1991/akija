@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import { formatKRW } from '../../utils/formatters'
-import { getAdjacentYearMonth } from '../../utils/dateUtils'
+import { getAdjacentYearMonth, formatKoreanTime } from '../../utils/dateUtils'
 
 export const StatsView: React.FC = () => {
   const { currentYearMonth, setCurrentYearMonth, transactions, categories, assets, openInputModal } = useAppStore()
@@ -585,9 +585,16 @@ export const StatsView: React.FC = () => {
                               className="flex items-center justify-between p-2.5 bg-[#121418] hover:bg-[#1c202a] active:scale-[0.99] border border-slate-800/90 rounded-xl transition-all cursor-pointer group/tx"
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="text-[10px] font-mono text-slate-400 bg-[#1a1d24] px-1.5 py-0.5 rounded border border-slate-800 shrink-0">
-                                  {m}.{d}
-                                </span>
+                                <div className="flex flex-col items-center shrink-0">
+                                  <span className="text-[10px] font-mono text-slate-400 bg-[#1a1d24] px-1.5 py-0.5 rounded border border-slate-800">
+                                    {m}.{d}
+                                  </span>
+                                  {tx.created_at && (
+                                    <span className="text-[9px] font-mono text-slate-500 mt-0.5">
+                                      {formatKoreanTime(tx.created_at)}
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="truncate">
                                   <div className="text-xs font-semibold text-slate-200 truncate group-hover/tx:text-white">
                                     {tx.memo || item.name}

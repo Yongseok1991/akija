@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import type { SupabaseConfig, Transaction, Category, Asset, Budget } from '../types'
+import { getKoreanNowString } from '../utils/dateUtils'
 
 let cachedClient: SupabaseClient | null = null
 let currentConfig: SupabaseConfig | null = null
@@ -42,7 +43,7 @@ export function sanitizeTxForDB(
     to_asset_id: toAssetId && (!validAssetIds || validAssetIds.has(toAssetId)) ? toAssetId : null,
     memo: tx.memo || '',
     image_url: tx.image_url || null,
-    created_at: tx.created_at || new Date().toISOString(),
+    created_at: tx.created_at || getKoreanNowString(),
     ...(isValidUUID(tx.user_id || userId) ? { user_id: tx.user_id || userId } : {}),
   }
 }

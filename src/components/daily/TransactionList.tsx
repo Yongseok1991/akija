@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Trash2, Image as ImageIcon } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import { formatKRW } from '../../utils/formatters'
-import { formatGroupDate } from '../../utils/dateUtils'
+import { formatGroupDate, formatKoreanTime } from '../../utils/dateUtils'
 import type { Transaction } from '../../types'
 import { ImageLightboxModal } from '../common/ImageLightboxModal'
 
@@ -173,11 +173,19 @@ export const TransactionList: React.FC = () => {
                             )}
                           </div>
 
-                          {/* Subtitle: "카테고리 | 결제수단" (Exact Screenshot Format) */}
+                          {/* Subtitle: "카테고리 | 결제수단 | 한국시간" */}
                           <div className="text-[12px] text-slate-400 mt-0.5 truncate flex items-center gap-1.5 font-normal">
                             <span>{categoryName}</span>
                             <span className="text-slate-600 font-light">|</span>
                             <span>{assetName}</span>
+                            {tx.created_at && (
+                              <>
+                                <span className="text-slate-600 font-light">|</span>
+                                <span className="text-slate-400 font-mono text-[11px]">
+                                  {formatKoreanTime(tx.created_at)}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

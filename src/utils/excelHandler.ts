@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { getTodayString } from './dateUtils'
 import type { Transaction, Category, Asset } from '../types'
 
 export interface ParsedExcelResult {
@@ -78,10 +79,10 @@ export function parseExcelRows(
           const parsed = XLSX.SSF.parse_date_code(numDate)
           dateStr = `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`
         } catch {
-          dateStr = new Date().toISOString().slice(0, 10)
+          dateStr = getTodayString()
         }
       } else {
-        dateStr = new Date().toISOString().slice(0, 10)
+        dateStr = getTodayString()
       }
     }
     dates.push(dateStr)

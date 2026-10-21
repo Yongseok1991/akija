@@ -12,7 +12,7 @@ import {
   DEFAULT_INCOME_CATEGORIES,
   DEFAULT_ASSETS,
 } from '../lib/constants'
-import { getCurrentYearMonth } from '../utils/dateUtils'
+import { getCurrentYearMonth, getKoreanNowString } from '../utils/dateUtils'
 import { generateUUID } from '../utils/formatters'
 import {
   exportToExcelFile,
@@ -354,7 +354,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newTx: Transaction = {
       ...txData,
       id: generateUUID(),
-      created_at: new Date().toISOString(),
+      created_at: getKoreanNowString(),
     }
 
     const nextAssets = adjustAssetBalance(
@@ -652,7 +652,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           category_id: catId,
           asset_id: assetId,
           id: generateUUID(),
-          created_at: new Date().toISOString(),
+          created_at: getKoreanNowString(),
           user_id: userId,
         }
         newTxs.push(newTx)

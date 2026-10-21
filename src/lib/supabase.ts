@@ -25,7 +25,8 @@ export function formatSupabaseError(error: any): string {
 export function sanitizeTxForDB(
   tx: Transaction,
   validCategoryIds?: Set<string>,
-  validAssetIds?: Set<string>
+  validAssetIds?: Set<string>,
+  userId?: string | null
 ): any {
   const catId = isValidUUID(tx.category_id) ? tx.category_id : null
   const assetId = isValidUUID(tx.asset_id) ? tx.asset_id : null
@@ -42,27 +43,30 @@ export function sanitizeTxForDB(
     memo: tx.memo || '',
     image_url: tx.image_url || null,
     created_at: tx.created_at || new Date().toISOString(),
+    ...(tx.user_id || userId ? { user_id: tx.user_id || userId } : {}),
   }
 }
 
-export function sanitizeCategoryForDB(c: Category): any {
+export function sanitizeCategoryForDB(c: Category, userId?: string | null): any {
   return {
     id: c.id,
     name: c.name,
     icon: c.icon || '📌',
     type: c.type || 'expense',
     sort_order: Number(c.sort_order) || 0,
+    ...(c.user_id || userId ? { user_id: c.user_id || userId } : {}),
   }
 }
 
-export function sanitizeAssetForDB(a: Asset): any {
+export function sanitizeAssetForDB(a: Asset, userId?: string | null): any {
   return {
     id: a.id,
     name: a.name,
-    type: a.type || 'bank',
+    type: a.type || 'card',
     balance: Number(a.balance) || 0,
     icon: a.icon || '💳',
     sort_order: Number(a.sort_order) || 0,
+    ...(a.user_id || userId ? { user_id: a.user_id || userId } : {}),
   }
 }
 
@@ -132,15 +136,31 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
    실시간 자동 클라우드 직접 반영 (Direct Auto Backend Operations)
 ============================================================================== */
 
+export async function claimUnassignedDataForUser(userId: string): Promise<void> {
+  const sb = getSupabase()
+  if (!sb || !userId) return
+  try {
+    await Promise.all([
+      sb.from('transactions').update({ user_id: userId }).is('user_id', null),
+      sb.from('categories').update({ user_id: userId }).is('user_id', null),
+      sb.from('assets').update({ user_id: userId }).is('user_id', null),
+      sb.from('budgets').update({ user_id: userId }).is('user_id', null),
+    ])
+  } catch (err) {
+    console.error('Failed to claim unassigned data for user:', err)
+  }
+}
+
 export async function supabaseInsertTransaction(
   tx: Transaction,
   validCategoryIds?: Set<string>,
-  validAssetIds?: Set<string>
+  validAssetIds?: Set<string>,
+  userId?: string | null
 ): Promise<{ success: boolean; error?: any }> {
   const sb = getSupabase()
   if (!sb) return { success: false, error: new Error('Supabase client not initialized') }
 
-  const payload = sanitizeTxForDB(tx, validCategoryIds, validAssetIds)
+  const payload = sanitizeTxForDB(tx, validCategoryIds, validAssetIds, userId)
   const { error } = await sb.from('transactions').insert([payload])
   if (error) {
     console.error('Supabase auto insert tx failed:', error)
@@ -152,13 +172,14 @@ export async function supabaseInsertTransaction(
 export async function supabaseInsertTransactionsBatch(
   txs: Transaction[],
   validCategoryIds?: Set<string>,
-  validAssetIds?: Set<string>
+  validAssetIds?: Set<string>,
+  userId?: string | null
 ): Promise<{ success: boolean; error?: any; count: number }> {
   const sb = getSupabase()
   if (!sb) return { success: false, error: new Error('Supabase client not initialized'), count: 0 }
   if (txs.length === 0) return { success: true, count: 0 }
 
-  const sanitized = txs.map((t) => sanitizeTxForDB(t, validCategoryIds, validAssetIds))
+  const sanitized = txs.map((t) => sanitizeTxForDB(t, validCategoryIds, validAssetIds, userId))
   const batchSize = 100
   for (let i = 0; i < sanitized.length; i += batchSize) {
     const chunk = sanitized.slice(i, i + batchSize)
@@ -174,12 +195,13 @@ export async function supabaseInsertTransactionsBatch(
 export async function supabaseUpdateTransaction(
   tx: Transaction,
   validCategoryIds?: Set<string>,
-  validAssetIds?: Set<string>
+  validAssetIds?: Set<string>,
+  userId?: string | null
 ): Promise<{ success: boolean; error?: any }> {
   const sb = getSupabase()
   if (!sb) return { success: false, error: new Error('Supabase client not initialized') }
 
-  const payload = sanitizeTxForDB(tx, validCategoryIds, validAssetIds)
+  const payload = sanitizeTxForDB(tx, validCategoryIds, validAssetIds, userId)
   const { error } = await sb.from('transactions').update(payload).eq('id', tx.id)
   if (error) {
     console.error('Supabase auto update tx failed:', error)
@@ -200,11 +222,11 @@ export async function supabaseDeleteTransaction(id: string): Promise<{ success: 
   return { success: true }
 }
 
-export async function supabaseUpsertAssets(assets: Asset[]): Promise<{ success: boolean; error?: any }> {
+export async function supabaseUpsertAssets(assets: Asset[], userId?: string | null): Promise<{ success: boolean; error?: any }> {
   const sb = getSupabase()
   if (!sb || assets.length === 0) return { success: false, error: new Error('Empty assets or no client') }
 
-  const sanitized = assets.map(sanitizeAssetForDB)
+  const sanitized = assets.map((a) => sanitizeAssetForDB(a, userId))
   const { error } = await sb.from('assets').upsert(sanitized)
   if (error) {
     console.error('Supabase auto upsert assets failed:', error)
@@ -213,11 +235,11 @@ export async function supabaseUpsertAssets(assets: Asset[]): Promise<{ success: 
   return { success: true }
 }
 
-export async function supabaseUpsertCategories(categories: Category[]): Promise<{ success: boolean; error?: any }> {
+export async function supabaseUpsertCategories(categories: Category[], userId?: string | null): Promise<{ success: boolean; error?: any }> {
   const sb = getSupabase()
   if (!sb || categories.length === 0) return { success: false, error: new Error('Empty categories or no client') }
 
-  const sanitized = categories.map(sanitizeCategoryForDB)
+  const sanitized = categories.map((c) => sanitizeCategoryForDB(c, userId))
   const { error } = await sb.from('categories').upsert(sanitized)
   if (error) {
     console.error('Supabase auto upsert categories failed:', error)
@@ -238,13 +260,14 @@ export async function supabaseDeleteCategory(id: string): Promise<{ success: boo
   return { success: true }
 }
 
-export async function supabaseUpsertBudget(budget: Budget): Promise<{ success: boolean; error?: any }> {
+export async function supabaseUpsertBudget(budget: Budget, userId?: string | null): Promise<{ success: boolean; error?: any }> {
   const sb = getSupabase()
   if (!sb) return { success: false, error: new Error('Supabase client not initialized') }
 
-  const payload = {
+  const payload: any = {
     year_month: budget.year_month,
     amount: Number(budget.amount) || 0,
+    ...(budget.user_id || userId ? { user_id: budget.user_id || userId } : {}),
   }
   const { error } = await sb.from('budgets').upsert([payload])
   if (error) {
@@ -254,16 +277,28 @@ export async function supabaseUpsertBudget(budget: Budget): Promise<{ success: b
   return { success: true }
 }
 
-export async function supabasePullAll() {
+export async function supabasePullAll(userId?: string | null) {
   const sb = getSupabase()
   if (!sb) return null
 
   try {
+    let catQ = sb.from('categories').select('*').order('sort_order', { ascending: true })
+    let assetQ = sb.from('assets').select('*').order('sort_order', { ascending: true })
+    let txQ = sb.from('transactions').select('*').order('date', { ascending: false })
+    let budgetQ = sb.from('budgets').select('*')
+
+    if (userId) {
+      catQ = catQ.eq('user_id', userId)
+      assetQ = assetQ.eq('user_id', userId)
+      txQ = txQ.eq('user_id', userId)
+      budgetQ = budgetQ.eq('user_id', userId)
+    }
+
     const [catRes, assetRes, txRes, budgetRes] = await Promise.all([
-      sb.from('categories').select('*').order('sort_order', { ascending: true }),
-      sb.from('assets').select('*').order('sort_order', { ascending: true }),
-      sb.from('transactions').select('*').order('date', { ascending: false }),
-      sb.from('budgets').select('*'),
+      catQ,
+      assetQ,
+      txQ,
+      budgetQ,
     ])
 
     if (catRes.error) console.warn('Supabase fetch categories notice:', catRes.error)

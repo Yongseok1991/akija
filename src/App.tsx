@@ -10,10 +10,11 @@ import { SettingsView } from './components/settings/SettingsView'
 import { FastInputModal } from './components/input/FastInputModal'
 import { ExcelImportModal } from './components/common/ExcelImportModal'
 import { PwaInstallPrompt } from './components/common/PwaInstallPrompt'
+import { AuthScreen } from './components/auth/AuthScreen'
 import { useAppStore } from './store/useAppStore'
 
 export function App() {
-  const { activeTab, isLoading, initCloudData, isExcelModalOpen, closeExcelModal } = useAppStore()
+  const { activeTab, isLoading, user, initCloudData, isExcelModalOpen, closeExcelModal } = useAppStore()
 
   // 100% Supabase 클라우드 데이터 즉시 로드
   useEffect(() => {
@@ -24,9 +25,14 @@ export function App() {
     return (
       <div className="min-h-screen bg-[#0d0f12] text-slate-100 flex flex-col items-center justify-center space-y-3 select-none">
         <div className="w-9 h-9 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs text-slate-400 font-medium">Supabase 클라우드 연결 중...</span>
+        <span className="text-xs text-slate-400 font-medium">안전한 데이터 동기화 확인 중...</span>
       </div>
     )
+  }
+
+  // 로그인되지 않은 사용자는 비공개 로그인 화면만 노출
+  if (!user) {
+    return <AuthScreen />
   }
 
   return (

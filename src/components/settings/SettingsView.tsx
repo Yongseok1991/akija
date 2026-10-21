@@ -12,11 +12,15 @@ import {
   Check,
   FileSpreadsheet,
   FileText,
+  User,
+  LogOut,
 } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 
 export const SettingsView: React.FC = () => {
   const {
+    user,
+    signOut,
     categories,
     addCategory,
     deleteCategory,
@@ -110,6 +114,36 @@ export const SettingsView: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {/* 0. Account & Security Card */}
+      <div className="bg-slate-850/90 border border-slate-750/90 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-blue-600/15 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+              <User className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-slate-400 font-medium">로그인 계정</div>
+              <div className="text-sm font-bold text-slate-100 truncate max-w-[200px]">
+                {user?.email || '비공개 사용자'}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm('로그아웃하시겠습니까? (이 기기에서 다시 로그인해야 합니다)')) {
+                signOut()
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-rose-500/15 hover:text-rose-400 text-slate-300 border border-slate-700/80 rounded-xl text-xs font-semibold active:scale-95 transition-all"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>로그아웃</span>
+          </button>
+        </div>
+      </div>
+
       {/* 1. Monthly Budget Card */}
       <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
         <div className="flex items-center gap-2">

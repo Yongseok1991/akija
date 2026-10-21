@@ -8,6 +8,7 @@ export interface Category {
   icon: string
   type: 'expense' | 'income'
   sort_order: number
+  user_id?: string | null
 }
 
 export interface Asset {
@@ -17,6 +18,7 @@ export interface Asset {
   balance: number
   icon: string
   sort_order: number
+  user_id?: string | null
 }
 
 export interface Transaction {
@@ -30,11 +32,13 @@ export interface Transaction {
   memo: string
   image_url?: string // 압축된 사진 데이터 (WebP base64 또는 URL)
   created_at: string
+  user_id?: string | null
 }
 
 export interface Budget {
   year_month: string // 'YYYY-MM'
   amount: number
+  user_id?: string | null
 }
 
 export interface SupabaseConfig {

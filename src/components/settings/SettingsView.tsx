@@ -223,7 +223,7 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {/* 2. Monthly Budget Card */}
-      <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-5 shadow-lg space-y-3">
+      <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-amber-400" />
           <h3 className="font-bold text-slate-100 text-sm">
@@ -232,7 +232,7 @@ export const SettingsView: React.FC = () => {
         </div>
 
         <form onSubmit={handleSaveBudget} className="flex gap-2">
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-0">
             <input
               type="number"
               value={budgetInput}
@@ -244,7 +244,7 @@ export const SettingsView: React.FC = () => {
           </div>
           <button
             type="submit"
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-2xl shadow-md active:scale-95 transition-all flex items-center gap-1"
+            className="shrink-0 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-2xl shadow-md active:scale-95 transition-all flex items-center gap-1"
           >
             {budgetSuccess ? <Check className="w-4 h-4" /> : null}
             <span>{budgetSuccess ? '저장됨' : '예산 저장'}</span>
@@ -253,19 +253,19 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {/* 3. Category Management */}
-      <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-5 shadow-lg space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-blue-400" />
-            <h3 className="font-bold text-slate-100 text-sm">카테고리 분류 관리</h3>
+      <div className="bg-slate-850/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Layers className="w-4 h-4 text-blue-400 shrink-0" />
+            <h3 className="font-bold text-slate-100 text-sm truncate">카테고리 관리</h3>
           </div>
 
-          <div className="flex bg-slate-800 p-0.5 rounded-xl border border-slate-700 text-xs">
+          <div className="flex bg-slate-800 p-0.5 rounded-xl border border-slate-700 text-xs shrink-0">
             <button
               type="button"
               onClick={() => setCatTab('expense')}
-              className={`px-3 py-1 rounded-lg font-semibold transition-all ${
-                catTab === 'expense' ? 'bg-blue-600 text-white' : 'text-slate-400'
+              className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+                catTab === 'expense' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'
               }`}
             >
               지출 ({categories.filter((c) => c.type === 'expense').length})
@@ -273,8 +273,8 @@ export const SettingsView: React.FC = () => {
             <button
               type="button"
               onClick={() => setCatTab('income')}
-              className={`px-3 py-1 rounded-lg font-semibold transition-all ${
-                catTab === 'income' ? 'bg-blue-600 text-white' : 'text-slate-400'
+              className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+                catTab === 'income' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400'
               }`}
             >
               수입 ({categories.filter((c) => c.type === 'income').length})
@@ -282,27 +282,29 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Add New Category Form */}
-        <form onSubmit={handleAddCategory} className="flex gap-2 pt-1">
+        {/* Add New Category Form (모바일 가로 짤림 방지: min-w-0, shrink-0 적용) */}
+        <form onSubmit={handleAddCategory} className="flex items-center gap-1.5 pt-1 w-full">
           <input
             type="text"
             value={newCatIcon}
             onChange={(e) => setNewCatIcon(e.target.value)}
-            placeholder="이모지"
-            className="w-16 px-2 py-2 text-center bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-blue-500"
+            placeholder="📌"
+            maxLength={2}
+            className="w-12 shrink-0 px-1 py-2 text-center bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-base focus:outline-none focus:border-blue-500 placeholder:text-slate-500"
+            title="이모지 입력"
           />
           <input
             type="text"
             value={newCatName}
             onChange={(e) => setNewCatName(e.target.value)}
             placeholder="새 카테고리 이름"
-            className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-blue-500"
+            className="flex-1 min-w-0 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-blue-500 placeholder:text-slate-500"
           />
           <button
             type="submit"
-            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-750 text-blue-400 border border-slate-700 rounded-xl font-bold text-xs flex items-center gap-1 active:scale-95"
+            className="shrink-0 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 active:scale-95 transition-all shadow-md shadow-blue-500/20"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             <span>추가</span>
           </button>
         </form>
@@ -310,13 +312,13 @@ export const SettingsView: React.FC = () => {
         {/* Categories List & Reordering */}
         <div className="max-h-64 overflow-y-auto divide-y divide-slate-800 pr-1">
           {filteredCategories.map((cat, idx) => (
-            <div key={cat.id} className="flex items-center justify-between py-2 group">
-              <div className="flex items-center gap-2.5">
-                <span className="text-xl">{cat.icon}</span>
-                <span className="text-xs font-semibold text-slate-200">{cat.name}</span>
+            <div key={cat.id} className="flex items-center justify-between py-2 group gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="text-lg shrink-0">{cat.icon}</span>
+                <span className="text-xs font-semibold text-slate-200 truncate">{cat.name}</span>
               </div>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => handleMoveCat(cat.id, 'up')}
@@ -342,7 +344,7 @@ export const SettingsView: React.FC = () => {
                       deleteCategory(cat.id)
                     }
                   }}
-                  className="p-1 text-slate-400 hover:text-rose-400 ml-1"
+                  className="p-1 text-slate-400 hover:text-rose-400 ml-0.5"
                   title="삭제"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

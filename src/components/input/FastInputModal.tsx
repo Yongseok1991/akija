@@ -91,7 +91,7 @@ export const FastInputModal: React.FC = () => {
         setToAsset(defaultToAsset)
       }
     }
-  }, [isInputModalOpen, editingTransaction, categories, assets])
+  }, [isInputModalOpen, editingTransaction])
 
   if (!isInputModalOpen) return null
 
@@ -136,25 +136,31 @@ export const FastInputModal: React.FC = () => {
 
   // Numpad key handlers
   const handleNumber = (digit: string) => {
-    if (expression === '0') {
-      setExpression(digit)
-    } else {
-      setExpression((prev) => prev + digit)
-    }
+    setExpression((prev) => {
+      if (!prev || prev === '0') {
+        if (digit === '00' || digit === '0') return '0'
+        return digit
+      }
+      return prev + digit
+    })
   }
 
   const handleOperator = (op: string) => {
-    if (!expression) return
-    const lastChar = expression.slice(-1)
-    if (['+', '-', '*', '/'].includes(lastChar)) {
-      setExpression((prev) => prev.slice(0, -1) + op)
-    } else {
-      setExpression((prev) => prev.slice(0, -1) + op)
-    }
+    setExpression((prev) => {
+      if (!prev) return ''
+      const lastChar = prev.slice(-1)
+      if (['+', '-', '*', '/'].includes(lastChar)) {
+        return prev.slice(0, -1) + op
+      }
+      return prev + op
+    })
   }
 
   const handleBackspace = () => {
-    setExpression((prev) => prev.slice(0, -1))
+    setExpression((prev) => {
+      if (!prev || prev.length <= 1) return ''
+      return prev.slice(0, -1)
+    })
   }
 
   const handleClear = () => {
@@ -269,7 +275,7 @@ export const FastInputModal: React.FC = () => {
       />
 
       {/* Main Bottom Sheet Modal */}
-      <div className="relative z-10 w-full max-w-lg mx-auto bg-slate-900 border-t border-slate-800 rounded-t-3xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden pb-safe animate-in slide-in-from-bottom-6 duration-200">
+      <div className="relative z-10 w-full max-w-lg mx-auto bg-slate-900 border-t border-slate-800 rounded-t-3xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden pb-safe pointer-events-auto animate-in slide-in-from-bottom-6 duration-200">
         {/* Top Handle & Close */}
         <div className="flex items-center justify-between px-5 pt-3 pb-1">
           <span className="text-xs font-bold text-slate-400">
@@ -328,12 +334,12 @@ export const FastInputModal: React.FC = () => {
         </div>
 
         {/* 2. Amount Live Display (Zero OS Keyboard Read-Only Display) */}
-        <div className="px-4 py-2 text-center bg-slate-950/40 border-y border-slate-800/60">
+        <div className="px-4 py-2 text-center bg-slate-950/40 border-y border-slate-800/60 select-none">
           <div className="text-[11px] text-slate-400 font-mono tracking-wider min-h-[1rem]">
-            {expression && /[+\-]/.test(expression) ? (
-              <span className="text-blue-400 font-semibold">{expression} =</span>
+            {expression ? (
+              <span className="text-blue-400 font-semibold">{expression} {/[+\-]/.test(expression) ? '=' : ''}</span>
             ) : (
-              <span>금액을 키패드로 입력하세요</span>
+              <span>금액을 아래 키패드로 입력하세요</span>
             )}
           </div>
           <div className="text-3xl font-black tracking-tight text-slate-100 flex items-center justify-center gap-1 mt-0.5">

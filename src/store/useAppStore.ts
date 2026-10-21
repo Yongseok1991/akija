@@ -137,6 +137,63 @@ function loadInitialData() {
       }))
 
       // 자산 잔액 업데이트
+      // 10월 최근 내역도 함께 시딩하여 이번 달(10월) 진입 시 바로 표시
+      const currentYM = getCurrentYearMonth()
+      const octTxs: Transaction[] = [
+        {
+          id: 'tx-oct-1',
+          date: `${currentYM}-21`,
+          amount: 8500,
+          type: 'expense',
+          category_id: categories.find((c) => c.name === '식비')?.id || categories[0]?.id,
+          asset_id: assets[0]?.id,
+          memo: '점심 제육덮밥',
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'tx-oct-2',
+          date: `${currentYM}-21`,
+          amount: 2500,
+          type: 'expense',
+          category_id: categories.find((c) => c.name === '카페/커피')?.id || categories[1]?.id,
+          asset_id: assets[0]?.id,
+          memo: '아이스 아메리카노',
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'tx-oct-3',
+          date: `${currentYM}-20`,
+          amount: 7600,
+          type: 'expense',
+          category_id: categories.find((c) => c.name === '집술')?.id || categories[3]?.id,
+          asset_id: assets[0]?.id,
+          memo: '생마차 4캔',
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'tx-oct-4',
+          date: `${currentYM}-15`,
+          amount: 14200,
+          type: 'expense',
+          category_id: categories.find((c) => c.name === '마트/편의점')?.id || categories[2]?.id,
+          asset_id: assets[0]?.id,
+          memo: '물, 제로콜라, 닭가슴살',
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'tx-oct-5',
+          date: `${currentYM}-10`,
+          amount: 3200000,
+          type: 'income',
+          category_id: categories.find((c) => c.name === '급여')?.id || categories[25]?.id,
+          asset_id: assets.find((a) => a.type === 'bank')?.id || assets[1]?.id,
+          memo: '10월 급여',
+          created_at: new Date().toISOString(),
+        },
+      ]
+
+      transactions = [...octTxs, ...transactions]
+
       transactions.forEach((tx) => {
         assets = adjustAssetBalance(assets, tx.type, tx.amount, tx.asset_id, tx.to_asset_id)
       })
@@ -214,7 +271,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   assets: initialData.assets,
   transactions: initialData.transactions,
   budgets: initialData.budgets,
-  currentYearMonth: '2026-09', // 바로 데이터가 있는 9월 혹은 현재월
+  currentYearMonth: getCurrentYearMonth(), // 이번 달 (10월) 자동 시작
   activeTab: 'daily',
   isInputModalOpen: false,
   isCsvModalOpen: false,
@@ -529,7 +586,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       assets: fresh.assets,
       transactions: fresh.transactions,
       budgets: fresh.budgets,
-      currentYearMonth: '2026-09',
+      currentYearMonth: getCurrentYearMonth(),
     })
   },
 }))

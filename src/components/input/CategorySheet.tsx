@@ -32,7 +32,7 @@ export const CategorySheet: React.FC<CategorySheetProps> = ({
       />
 
       {/* Sheet Content */}
-      <div className="relative z-10 bg-slate-900 border-t border-slate-800 rounded-t-3xl max-h-[82vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
+      <div className="relative z-10 bg-[#121418] border-t border-slate-800 rounded-t-3xl max-h-[82vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
         {/* Handle bar */}
         <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mt-3 mb-2" />
 
@@ -68,8 +68,8 @@ export const CategorySheet: React.FC<CategorySheetProps> = ({
                   }}
                   className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border transition-all active:scale-95 ${
                     isSelected
-                      ? 'bg-blue-600/20 border-blue-500 text-blue-300 font-bold shadow-md shadow-blue-500/10'
-                      : 'bg-slate-800/80 border-slate-750 text-slate-300 hover:bg-slate-750 hover:border-slate-700'
+                      ? 'bg-blue-600/25 border-blue-500 text-blue-300 font-bold shadow-md shadow-blue-500/15'
+                      : 'bg-[#1a1d24] border-slate-800 text-slate-300 hover:bg-[#222630] hover:border-slate-700'
                   }`}
                 >
                   <span className="text-2xl mb-1.5 filter drop-shadow-sm">{cat.icon}</span>

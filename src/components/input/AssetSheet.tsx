@@ -51,8 +51,8 @@ export const AssetSheet: React.FC<AssetSheetProps> = ({
       />
 
       {/* Sheet Content */}
-      <div className="relative z-10 bg-slate-900 border-t border-slate-800 rounded-t-3xl max-h-[80vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
-        <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mt-3 mb-2" />
+      <div className="relative z-10 bg-[#121418] border-t border-slate-800 rounded-t-3xl max-h-[80vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
+        <div className="w-12 h-1.5 bg-slate-700/60 rounded-full mx-auto mt-3 mb-2" />
 
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
           <div>
@@ -62,15 +62,15 @@ export const AssetSheet: React.FC<AssetSheetProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-200 rounded-full hover:bg-slate-800"
+            className="p-2 text-slate-400 hover:text-slate-200 rounded-full hover:bg-slate-800/60"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* 2-segment Tab (신용/체크카드 | 현금) */}
-        <div className="p-3 bg-slate-950/50">
-          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-800/80 rounded-2xl border border-slate-700/50">
+        <div className="p-3 bg-[#0d0f12]">
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#1a1d24] rounded-2xl border border-slate-800">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.key
               return (
@@ -112,7 +112,7 @@ export const AssetSheet: React.FC<AssetSheetProps> = ({
                   className={`w-full flex items-center justify-between p-3.5 rounded-2xl border transition-all active:scale-[0.98] ${
                     isSelected
                       ? 'bg-blue-600/20 border-blue-500 text-blue-300 font-bold'
-                      : 'bg-slate-800/90 border-slate-750 text-slate-200 hover:bg-slate-750'
+                      : 'bg-[#1a1d24] border-slate-800/80 text-slate-200 hover:bg-[#222630]'
                   }`}
                 >
                   <div className="flex items-center gap-3">

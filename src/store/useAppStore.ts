@@ -31,8 +31,6 @@ import {
   supabaseDeleteCategory,
   supabaseUpsertBudget,
   formatSupabaseError,
-  verifyOwnerCredentials,
-  updateOwnerPassword,
 } from '../lib/supabase'
 import { authenticateWithBiometrics } from '../utils/webAuthn'
 
@@ -64,7 +62,7 @@ interface AppState {
   isExcelModalOpen: boolean
   isCsvModalOpen: boolean
   editingTransaction: Transaction | null
-  user: { username: string } | null
+  user: { username: string; id?: string; email?: string } | null
   signIn: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
   unlockWithBiometrics: () => Promise<{ success: boolean; error?: string }>
   changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>
@@ -175,21 +173,36 @@ export const useAppStore = create<AppState>((set, get) => ({
   isSearchOpen: false,
   user: null,
 
-  signIn: async (username, password) => {
+  signIn: async (usernameOrEmail, password) => {
     set({ isLoading: true })
-    const res = await verifyOwnerCredentials(username, password)
-    if (!res.success) {
+    const sb = getSupabase()
+    if (!sb) {
       set({ isLoading: false })
-      return { success: false, error: res.error || '아이디 또는 비밀번호가 일치하지 않습니다.' }
+      return { success: false, error: '클라우드에 연결할 수 없습니다.' }
     }
 
-    const userData = { username: res.username || username.trim() }
-    try {
-      localStorage.setItem('akija_owner_session', JSON.stringify(userData))
-    } catch {
-      // ignore
+    if (!password || !password.trim()) {
+      set({ isLoading: false })
+      return { success: false, error: '비밀번호를 입력해 주세요.' }
     }
 
+    const email = usernameOrEmail.includes('@') ? usernameOrEmail.trim() : 'dobest0998@gmail.com'
+
+    const { data, error } = await sb.auth.signInWithPassword({
+      email,
+      password: password.trim(),
+    })
+
+    if (error || !data.user) {
+      set({ isLoading: false })
+      return { success: false, error: '아이디 또는 비밀번호가 일치하지 않습니다.' }
+    }
+
+    const userData = {
+      username: 'yongseok',
+      id: data.user.id,
+      email: data.user.email,
+    }
     set({ user: userData })
     await get().initCloudData()
     return { success: true }
@@ -203,39 +216,33 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { success: false, error: bioRes.error }
     }
 
-    let username = 'yongseok'
-    try {
-      const sessionStr = localStorage.getItem('akija_owner_session')
-      if (sessionStr) {
-        username = JSON.parse(sessionStr).username || 'yongseok'
+    const sb = getSupabase()
+    if (sb) {
+      const { data: { session } } = await sb.auth.getSession()
+      if (session?.user) {
+        set({ user: { username: 'yongseok', id: session.user.id, email: session.user.email } })
+        await get().initCloudData()
+        return { success: true }
       }
-    } catch {
-      // fallback
     }
+    set({ isLoading: false })
+    return { success: false, error: '비밀번호로 먼저 1회 로그인해 주세요.' }
+  },
 
-    const userData = { username }
-    try {
-      localStorage.setItem('akija_owner_session', JSON.stringify(userData))
-    } catch {
-      // ignore
+  changePassword: async (_oldPassword, newPassword) => {
+    const sb = getSupabase()
+    if (!sb) return { success: false, error: '클라우드에 연결할 수 없습니다.' }
+    const { error } = await sb.auth.updateUser({ password: newPassword })
+    if (error) {
+      return { success: false, error: error.message }
     }
-
-    set({ user: userData })
-    await get().initCloudData()
     return { success: true }
   },
 
-  changePassword: async (oldPassword, newPassword) => {
-    const user = get().user
-    if (!user) return { success: false, error: '로그인이 필요합니다.' }
-    return await updateOwnerPassword(user.username, oldPassword, newPassword)
-  },
-
   signOut: async () => {
-    try {
-      localStorage.removeItem('akija_owner_session')
-    } catch {
-      // ignore
+    const sb = getSupabase()
+    if (sb) {
+      await sb.auth.signOut()
     }
     set({
       user: null,
@@ -267,32 +274,27 @@ export const useAppStore = create<AppState>((set, get) => ({
   setFilterType: (filter) => set({ filterType: filter }),
   setIsSearchOpen: (open) => set({ isSearchOpen: open }),
 
-  // 100% Supabase 전용 초기 로드 및 시딩
+  // 100% Supabase 전용 초기 로드 및 소유자 세션 복원
   initCloudData: async () => {
     set({ isLoading: true })
     const sb = getSupabase()
     if (!sb) {
-      set({ isLoading: false, user: null })
+      set({ isLoading: false, user: null, isCloudConnected: false })
       return
     }
 
     try {
-      // 1. 현재 사용자 인증 세션 확인 (이 기기 로그인 유지)
-      let storedUser = get().user
-      if (!storedUser) {
-        try {
-          const sessionStr = localStorage.getItem('akija_owner_session')
-          if (sessionStr) {
-            storedUser = JSON.parse(sessionStr)
-            set({ user: storedUser })
-          }
-        } catch {
-          storedUser = null
-        }
-      }
+      // 1. Supabase 공식 인증 세션 확인 (이 기기 브라우저에 저장된 세션 복원)
+      const { data: { session } } = await sb.auth.getSession()
 
-      // 로그인되지 않은 방문자: 데이터 전혀 로드하지 않고 차단
-      if (!storedUser) {
+      if (session?.user) {
+        const userData = {
+          username: 'yongseok',
+          id: session.user.id,
+          email: session.user.email,
+        }
+        set({ user: userData })
+      } else {
         set({
           categories: [],
           assets: [],
@@ -300,12 +302,13 @@ export const useAppStore = create<AppState>((set, get) => ({
           budgets: [],
           isLoading: false,
           isCloudConnected: false,
+          user: null,
         })
         return
       }
 
       // 2. 가계부 데이터 안전하게 로드
-      const data = await supabasePullAll()
+      const data = await supabasePullAll(session.user.id)
       let categories = data?.categories || []
       let assets = data?.assets || []
       const transactions = data?.transactions || []
@@ -322,7 +325,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           id: generateUUID(),
         }))
         categories = [...expenseCats, ...incomeCats]
-        await supabaseUpsertCategories(categories)
+        await supabaseUpsertCategories(categories, session.user.id)
       }
 
       // 자산이 없으면 기본 자산 시딩
@@ -332,7 +335,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           id: generateUUID(),
           balance: 0,
         }))
-        await supabaseUpsertAssets(assets)
+        await supabaseUpsertAssets(assets, session.user.id)
       }
 
       set({
@@ -367,7 +370,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const validCatIds = new Set(get().categories.map((c) => c.id))
     const validAssetIds = new Set(get().assets.map((a) => a.id))
-    const userId = null
+    const userId = get().user?.id || null
 
     // Supabase에 먼저 반영
     const [txRes, assetRes] = await Promise.all([
@@ -419,7 +422,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const validCatIds = new Set(get().categories.map((c) => c.id))
     const validAssetIds = new Set(get().assets.map((a) => a.id))
-    const userId = null
+    const userId = get().user?.id || null
 
     const [txRes, assetRes] = await Promise.all([
       supabaseUpdateTransaction(updatedTx, validCatIds, validAssetIds, userId),
@@ -476,7 +479,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // 카테고리 관리: Supabase 직접 반영
   addCategory: async (cat) => {
-    const userId = null
+    const userId = get().user?.id || null
     const newCat: Category = {
       ...cat,
       id: generateUUID(),
@@ -492,7 +495,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateCategory: async (cat) => {
-    const userId = null
+    const userId = get().user?.id || null
     const nextCats = get().categories.map((c) => (c.id === cat.id ? { ...cat, user_id: userId } : c))
     const res = await supabaseUpsertCategories(nextCats, userId)
     if (!res.success) {
@@ -513,7 +516,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   reorderCategories: async (cats) => {
-    const userId = null
+    const userId = get().user?.id || null
     const ordered = cats.map((c, idx) => ({ ...c, sort_order: idx + 1, user_id: userId }))
     await supabaseUpsertCategories(ordered, userId)
     set({ categories: ordered })
@@ -521,7 +524,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // 자산 관리: Supabase 직접 반영
   addAsset: async (asset) => {
-    const userId = null
+    const userId = get().user?.id || null
     const newAsset: Asset = {
       ...asset,
       id: generateUUID(),
@@ -537,7 +540,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateAsset: async (asset) => {
-    const userId = null
+    const userId = get().user?.id || null
     const nextAssets = get().assets.map((a) => (a.id === asset.id ? { ...asset, user_id: userId } : a))
     const res = await supabaseUpsertAssets(nextAssets, userId)
     if (!res.success) {
@@ -562,7 +565,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // 예산 관리: Supabase 직접 반영
   setBudget: async (yearMonth, amount) => {
-    const userId = null
+    const userId = get().user?.id || null
     const res = await supabaseUpsertBudget({ year_month: yearMonth, amount, user_id: userId }, userId)
     if (!res.success) {
       alert(`예산 저장 실패: ${formatSupabaseError(res.error)}`)
@@ -616,7 +619,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
     }
 
-    const userId = null
+    const userId = get().user?.id || null
 
     // 2. 카테고리가 Supabase에 먼저 온전히 반영되도록 업서트 (외래키 제약조건 방지)
     const catUpsertRes = await supabaseUpsertCategories(currentCategories, userId)

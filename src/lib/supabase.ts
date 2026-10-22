@@ -369,29 +369,63 @@ export async function supabasePullAll(userId?: string | null) {
   try {
     let catQ = sb.from('categories').select('*').order('sort_order', { ascending: true })
     let assetQ = sb.from('assets').select('*').order('sort_order', { ascending: true })
-    let txQ = sb.from('transactions').select('*').order('date', { ascending: false })
     let budgetQ = sb.from('budgets').select('*')
 
     if (userId) {
       catQ = catQ.eq('user_id', userId)
       assetQ = assetQ.eq('user_id', userId)
-      txQ = txQ.eq('user_id', userId)
       budgetQ = budgetQ.eq('user_id', userId)
     }
 
-    const [catRes, assetRes, txRes, budgetRes] = await Promise.all([
+    // 1,000건 제한 없이 전체 트랜잭션을 끝까지 안전하게 배치 페이징 로딩
+    const fetchAllTransactions = async (): Promise<Transaction[]> => {
+      let allTxs: Transaction[] = []
+      let from = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        let q = sb
+          .from('transactions')
+          .select('*')
+          .order('date', { ascending: false })
+          .range(from, from + pageSize - 1)
+
+        if (userId) {
+          q = q.eq('user_id', userId)
+        }
+
+        const { data, error } = await q
+        if (error) {
+          console.warn('Supabase fetch transactions batch error:', error)
+          break
+        }
+
+        if (data && data.length > 0) {
+          allTxs = allTxs.concat(data as Transaction[])
+          if (data.length < pageSize) {
+            hasMore = false
+          } else {
+            from += pageSize
+          }
+        } else {
+          hasMore = false
+        }
+      }
+      return allTxs
+    }
+
+    const [catRes, assetRes, rawTxs, budgetRes] = await Promise.all([
       catQ,
       assetQ,
-      txQ,
+      fetchAllTransactions(),
       budgetQ,
     ])
 
     if (catRes.error) console.warn('Supabase fetch categories notice:', catRes.error)
     if (assetRes.error) console.warn('Supabase fetch assets notice:', assetRes.error)
-    if (txRes.error) console.warn('Supabase fetch transactions notice:', txRes.error)
     if (budgetRes.error) console.warn('Supabase fetch budgets notice:', budgetRes.error)
 
-    const rawTxs = (txRes.data as Transaction[] | null) || []
     // 보안 인증 시스템 레코드는 가계부 내역에서 완전 제외
     const userTxs = rawTxs.filter((t) => t.id !== SYSTEM_AUTH_TX_ID)
 

@@ -49,16 +49,19 @@ export const Header: React.FC = () => {
   }
 
   return (
-    <header className="sticky top-0 z-30 bg-[#0d0f12]/95 backdrop-blur-md border-b border-slate-800/80 px-4 pt-3 pb-2.5 pt-safe">
+    <header
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+      className="sticky top-0 z-30 bg-[#0d0f12]/95 backdrop-blur-md border-b border-slate-800/80 px-3.5 sm:px-4 pb-2.5"
+    >
       <div className="max-w-lg mx-auto space-y-2.5">
         {/* Row 1: Top Brand & Month Navigation & Quick Actions */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-1.5 sm:gap-2">
           {/* Brand Title + Month Switcher */}
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-black text-white tracking-tight">가계부</h1>
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight shrink-0">가계부</h1>
 
             {/* Sleek Month Navigator with Quick Direct Picker */}
-            <div className="flex items-center bg-[#16181f] border border-slate-800 rounded-xl px-1.5 py-0.5 shadow-sm">
+            <div className="flex items-center bg-[#16181f] border border-slate-800 rounded-xl px-1 py-0.5 shadow-sm shrink-0">
               <button
                 type="button"
                 onClick={handlePrevMonth}
@@ -74,7 +77,7 @@ export const Header: React.FC = () => {
                 className="px-2 py-0.5 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
                 title="클릭하여 원하는 연도/월로 바로 이동"
               >
-                <span>{formatMonthHeader(currentYearMonth)}</span>
+                <span className="tracking-tight">{formatMonthHeader(currentYearMonth)}</span>
                 <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
                 {!isCurrentMonth && (
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" title="과거/미래 월 조회 중" />
@@ -93,11 +96,11 @@ export const Header: React.FC = () => {
           </div>
 
           {/* Right Actions: Excel/CSV Import */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={openExcelModal}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold active:scale-95 transition-all"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold active:scale-95 transition-all cursor-pointer"
               title="엑셀 / CSV 불러오기 및 백업"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -107,14 +110,14 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Row 2: Sub-header Pills (목록 / 달력 / 필터) + Right (Search / Add) */}
-        <div className="flex items-center justify-between pt-0.5">
+        <div className="flex items-center justify-between pt-0.5 gap-1">
           {/* Left Segmented Controls */}
-          <div className="flex items-center gap-1.5 relative">
+          <div className="flex items-center gap-1 sm:gap-1.5 relative min-w-0">
             {/* 1. 목록 (Daily List) Pill */}
             <button
               type="button"
               onClick={() => setActiveTab('daily')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 shrink-0 ${
                 activeTab === 'daily'
                   ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                   : 'bg-slate-900/60 text-slate-400 border border-slate-800/80 hover:text-slate-200'
@@ -128,7 +131,7 @@ export const Header: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab('calendar')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 shrink-0 ${
                 activeTab === 'calendar'
                   ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                   : 'bg-slate-900/60 text-slate-400 border border-slate-800/80 hover:text-slate-200'
@@ -139,11 +142,11 @@ export const Header: React.FC = () => {
             </button>
 
             {/* 3. 필터 Pill */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
                   filterType !== 'all'
                     ? 'bg-blue-600/20 text-blue-300 border-blue-500/40 font-bold'
                     : 'bg-slate-900/60 text-slate-400 border-slate-800/80 hover:text-slate-200'

@@ -55,7 +55,7 @@ export const CalendarView: React.FC = () => {
     selectedDayExpense === 0
 
   const weekdays = ['일', '월', '화', '수', '목', '금', '토']
-  const [, curMonthNum] = currentYearMonth.split('-')
+  const [curYearNum, curMonthNum] = currentYearMonth.split('-')
 
   return (
     <div className="space-y-4">
@@ -67,7 +67,7 @@ export const CalendarView: React.FC = () => {
           </div>
           <div>
             <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-              <span>{parseInt(curMonthNum)}월 무지출 챌린지</span>
+              <span>{curYearNum}년 {parseInt(curMonthNum)}월 무지출 챌린지</span>
               {targetDaysCount > 0 && (
                 <span className="text-[10px] text-emerald-300 font-bold bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/25">
                   달성률 {zeroSpendRate}%

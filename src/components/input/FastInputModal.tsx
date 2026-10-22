@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import {
   X,
   Calendar,
+  Clock,
   ChevronDown,
   TrendingDown,
   TrendingUp,
@@ -14,7 +15,13 @@ import type { Category, Asset } from '../../types'
 import { useAppStore } from '../../store/useAppStore'
 import { CategorySheet } from './CategorySheet'
 import { AssetSheet } from './AssetSheet'
-import { getTodayString } from '../../utils/dateUtils'
+import {
+  getTodayString,
+  getKstCurrentTime,
+  getKstTimeFromIso,
+  combineKstDateTimeToIso,
+  formatTimeLabel,
+} from '../../utils/dateUtils'
 import { compressImage } from '../../utils/imageCompressor'
 
 // 숫자로만 추출 후 3자리 콤마 포맷팅
@@ -46,6 +53,7 @@ export const FastInputModal: React.FC = () => {
   const [type, setType] = useState<'expense' | 'income'>('expense')
   const [amountStr, setAmountStr] = useState<string>('')
   const [date, setDate] = useState<string>(getTodayString())
+  const [timeStr, setTimeStr] = useState<string>(getKstCurrentTime())
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [memo, setMemo] = useState<string>('')
@@ -58,6 +66,7 @@ export const FastInputModal: React.FC = () => {
   const amountInputRef = useRef<HTMLInputElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const datePickerRef = useRef<HTMLInputElement | null>(null)
+  const timePickerRef = useRef<HTMLInputElement | null>(null)
 
   // Bottom sheet triggers
   const [isCategorySheetOpen, setIsCategorySheetOpen] = useState(false)
@@ -71,6 +80,7 @@ export const FastInputModal: React.FC = () => {
         setType(editingTransaction.type === 'income' ? 'income' : 'expense')
         setAmountStr(formatAmount(editingTransaction.amount))
         setDate(editingTransaction.date)
+        setTimeStr(getKstTimeFromIso(editingTransaction.created_at))
         setMemo(editingTransaction.memo || '')
         setImageUrl(editingTransaction.image_url || null)
         setImageSizeKb(null)
@@ -81,10 +91,11 @@ export const FastInputModal: React.FC = () => {
         const ast = assets.find((a) => a.id === editingTransaction.asset_id) || assets[0] || null
         setSelectedAsset(ast)
       } else {
-        // Smart Default mode: 오늘 날짜, 지출
+        // Smart Default mode: 오늘 날짜, 현재 시각, 지출
         setType('expense')
         setAmountStr('')
         setDate(getTodayString())
+        setTimeStr(getKstCurrentTime())
         setMemo('')
         setImageUrl(null)
         setImageSizeKb(null)
@@ -231,6 +242,8 @@ export const FastInputModal: React.FC = () => {
       return
     }
 
+    const finalCreatedAt = combineKstDateTimeToIso(date, timeStr)
+
     if (editingTransaction) {
       updateTransaction({
         ...editingTransaction,
@@ -241,6 +254,7 @@ export const FastInputModal: React.FC = () => {
         asset_id: selectedAsset.id,
         memo,
         image_url: imageUrl || undefined,
+        created_at: finalCreatedAt,
       })
     } else {
       addTransaction({
@@ -251,6 +265,7 @@ export const FastInputModal: React.FC = () => {
         asset_id: selectedAsset.id,
         memo,
         image_url: imageUrl || undefined,
+        created_at: finalCreatedAt,
       })
     }
   }
@@ -295,6 +310,15 @@ export const FastInputModal: React.FC = () => {
         ref={datePickerRef}
         value={date}
         onChange={(e) => setDate(e.target.value)}
+        className="sr-only absolute"
+      />
+
+      {/* Hidden Native Time Input */}
+      <input
+        type="time"
+        ref={timePickerRef}
+        value={timeStr}
+        onChange={(e) => setTimeStr(e.target.value)}
         className="sr-only absolute"
       />
 
@@ -441,9 +465,10 @@ export const FastInputModal: React.FC = () => {
             </div>
           </div>
 
-          {/* 3. Fast Selector Grid (날짜, 카테고리, 결제수단 3분할 그리드) */}
-          <div className="px-4 py-3 space-y-2.5">
-            <div className="grid grid-cols-3 gap-1.5">
+          {/* 3. Fast Selector Grid (날짜&시간, 분류&결제수단 2x2 그리드) */}
+          <div className="px-4 py-3 space-y-2">
+            {/* Row 1: Date & Time */}
+            <div className="grid grid-cols-2 gap-2">
               {/* Quick Date Picker */}
               <button
                 type="button"
@@ -454,22 +479,49 @@ export const FastInputModal: React.FC = () => {
                     datePickerRef.current?.click()
                   }
                 }}
-                className="flex items-center justify-center gap-1 px-2 py-2.5 bg-[#1a1d24] hover:bg-[#222630] border border-slate-800 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+                className="flex items-center justify-between px-3 py-2.5 bg-[#1a1d24] hover:bg-[#222630] border border-slate-800 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all cursor-pointer min-w-0"
                 title="날짜 선택"
               >
-                <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span className="truncate">{formatDateLabel(date)}</span>
+                <div className="flex items-center gap-1.5 truncate">
+                  <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span className="truncate">{formatDateLabel(date)}</span>
+                </div>
                 <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
               </button>
 
+              {/* Quick Time Picker */}
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    (timePickerRef.current as any)?.showPicker?.() || timePickerRef.current?.click()
+                  } catch {
+                    timePickerRef.current?.click()
+                  }
+                }}
+                className="flex items-center justify-between px-3 py-2.5 bg-[#1a1d24] hover:bg-[#222630] border border-slate-800 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all cursor-pointer min-w-0"
+                title="시간 선택 (기본: 현재 시간)"
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span className="truncate">{formatTimeLabel(timeStr)}</span>
+                </div>
+                <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+              </button>
+            </div>
+
+            {/* Row 2: Category & Asset */}
+            <div className="grid grid-cols-2 gap-2">
               {/* Category Button */}
               <button
                 type="button"
                 onClick={() => setIsCategorySheetOpen(true)}
-                className="flex items-center justify-center gap-1 px-2 py-2.5 bg-[#1a1d24] hover:bg-[#222630] border border-slate-800 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+                className="flex items-center justify-between px-3 py-2.5 bg-[#1a1d24] hover:bg-[#222630] border border-slate-800 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all cursor-pointer min-w-0"
               >
-                <span className="text-sm shrink-0">{selectedCategory?.icon || '🏷️'}</span>
-                <span className="truncate">{selectedCategory?.name || '분류'}</span>
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="text-sm shrink-0">{selectedCategory?.icon || '🏷️'}</span>
+                  <span className="truncate">{selectedCategory?.name || '분류'}</span>
+                </div>
                 <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
               </button>
 
@@ -477,10 +529,12 @@ export const FastInputModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsAssetSheetOpen(true)}
-                className="flex items-center justify-center gap-1 px-2 py-2.5 bg-[#1a1d24] hover:bg-[#222630] border border-slate-800 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all truncate"
+                className="flex items-center justify-between px-3 py-2.5 bg-[#1a1d24] hover:bg-[#222630] border border-slate-800 rounded-xl text-xs font-semibold text-slate-200 active:scale-95 transition-all cursor-pointer min-w-0"
               >
-                <span className="text-sm shrink-0">{selectedAsset?.icon || '💳'}</span>
-                <span className="truncate">{selectedAsset?.name || '결제수단'}</span>
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="text-sm shrink-0">{selectedAsset?.icon || '💳'}</span>
+                  <span className="truncate">{selectedAsset?.name || '결제수단'}</span>
+                </div>
                 <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
               </button>
             </div>

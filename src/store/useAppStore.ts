@@ -88,7 +88,7 @@ interface AppState {
 
   // 100% Supabase Cloud CRUD Operations
   initCloudData: () => Promise<void>
-  addTransaction: (tx: Omit<Transaction, 'id' | 'created_at'>) => Promise<void>
+  addTransaction: (tx: Omit<Transaction, 'id' | 'created_at'> & { created_at?: string }) => Promise<void>
   updateTransaction: (tx: Transaction) => Promise<void>
   deleteTransaction: (id: string) => Promise<void>
 
@@ -354,7 +354,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newTx: Transaction = {
       ...txData,
       id: generateUUID(),
-      created_at: getKoreanNowString(),
+      created_at: txData.created_at || getKoreanNowString(),
     }
 
     const nextAssets = adjustAssetBalance(

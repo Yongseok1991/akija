@@ -1,0 +1,29 @@
+name: Supabase Keep-Alive Ping
+
+on:
+  schedule:
+    # 매 3일마다 오전 09:00 KST (00:00 UTC)에 자동 실행하여 Supabase 일시정지(Pause) 방지
+    - cron: '0 0 */3 * *'
+  workflow_dispatch: # GitHub Actions 대시보드에서 원클릭 수동 테스트 가능
+
+jobs:
+  ping:
+    name: Keep Supabase Awake
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send API Ping
+        run: |
+          echo "Sending keep-alive query to Supabase..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_hJBHICYN2bmEuZ0kgHx4IA_wQDFcVbv' }}" \
+            -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_hJBHICYN2bmEuZ0kgHx4IA_wQDFcVbv' }}" \
+            "${{ secrets.VITE_SUPABASE_URL || 'https://wgcxltpiugskakyequsf.supabase.co' }}/rest/v1/categories?select=id&limit=1")
+
+          echo "HTTP Response Status: $STATUS"
+
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
+            echo "✅ Successfully pinged Supabase! 7-day inactivity timer has been reset."
+          else
+            echo "❌ Failed to ping Supabase. HTTP Status: $STATUS"
+            exit 1
+          fi

@@ -9,7 +9,6 @@ import { AssetOverview } from './components/assets/AssetOverview'
 import { SettingsView } from './components/settings/SettingsView'
 import { FastInputModal } from './components/input/FastInputModal'
 import { ExcelImportModal } from './components/common/ExcelImportModal'
-import { PwaInstallPrompt } from './components/common/PwaInstallPrompt'
 import { AuthScreen } from './components/auth/AuthScreen'
 import { useAppStore } from './store/useAppStore'
 
@@ -37,9 +36,6 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#0d0f12] text-slate-100 flex flex-col font-sans select-none antialiased">
-      {/* PWA Fullscreen Install Banner (Only shown if running in browser with URL bar) */}
-      <PwaInstallPrompt />
-
       {/* Sticky Top Month Header with Quick Month Nav & CSV button */}
       <Header />
 

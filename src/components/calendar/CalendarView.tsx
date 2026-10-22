@@ -6,7 +6,7 @@ import {
 } from '../../utils/dateUtils'
 import { useAppStore } from '../../store/useAppStore'
 import { formatKRW } from '../../utils/formatters'
-import { Plus, Repeat, Sparkles, CheckCircle2 } from 'lucide-react'
+import { Plus, Repeat, CheckCircle2 } from 'lucide-react'
 
 export const CalendarView: React.FC = () => {
   const { currentYearMonth, transactions, categories, assets, openInputModal } = useAppStore()
@@ -39,7 +39,6 @@ export const CalendarView: React.FC = () => {
   })
 
   const zeroSpendDaysCount = zeroSpendDays.length
-  const zeroSpendRate = targetDaysCount > 0 ? Math.round((zeroSpendDaysCount / targetDaysCount) * 100) : 0
 
   // Selected date transactions
   const selectedDayTransactions = transactions.filter((t) => t.date === selectedDate)
@@ -59,43 +58,24 @@ export const CalendarView: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* 1. Zero-Spending Challenge Summary Card (무지출 달성 현황 카운팅) */}
-      <div className="bg-[#121418] border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg flex items-center justify-between">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xl shadow-sm">
-            🌱
-          </div>
-          <div>
-            <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-              <span>{curYearNum}년 {parseInt(curMonthNum)}월 무지출 챌린지</span>
-              {targetDaysCount > 0 && (
-                <span className="text-[10px] text-emerald-300 font-bold bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/25">
-                  달성률 {zeroSpendRate}%
-                </span>
-              )}
-            </div>
-            <div className="text-base font-extrabold text-white mt-0.5 flex items-baseline gap-1.5">
-              <span className="text-emerald-400 font-black text-lg">총 {zeroSpendDaysCount}일 달성</span>
-              {targetDaysCount > 0 && (
-                <span className="text-xs text-slate-500 font-normal">
-                  / 경과 {targetDaysCount}일 중
-                </span>
-              )}
-            </div>
+      {/* Calendar Grid Card */}
+      <div className="bg-[#121418] border border-slate-800 rounded-3xl p-3.5 sm:p-4 shadow-lg">
+        {/* Calendar Title & Zero-Spending Inline Counter */}
+        <div className="flex items-center justify-between mb-3 px-1">
+          <span className="text-sm font-bold text-slate-200">
+            {curYearNum}년 {parseInt(curMonthNum)}월
+          </span>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+            <span>🌱</span>
+            <span>무지출 {zeroSpendDaysCount}일</span>
+            {targetDaysCount > 0 && (
+              <span className="text-[10px] text-emerald-300/80 font-normal">
+                / {targetDaysCount}일
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="text-right">
-          <div className="text-[11px] text-slate-400 font-medium">지출 0원인 날</div>
-          <div className="text-xs font-bold text-emerald-400 mt-0.5 flex items-center justify-end gap-1">
-            <Sparkles className="w-3 h-3 text-amber-400" />
-            <span>{zeroSpendDaysCount > 0 ? `${zeroSpendDaysCount}일 절약 성공!` : '오늘 무지출 도전!'}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Calendar Grid Card */}
-      <div className="bg-[#121418] border border-slate-800 rounded-3xl p-3 sm:p-4 shadow-lg">
         {/* Weekday Header */}
         <div className="grid grid-cols-7 mb-2 text-center">
           {weekdays.map((day, idx) => (

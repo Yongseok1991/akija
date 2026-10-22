@@ -19,24 +19,11 @@ export function getCurrentYearMonth(date: Date = new Date()): string {
 }
 
 /**
- * Supabase DB 및 로컬 저장 시 한국시간(KST) 그대로 저장되도록 하는 포맷터
- * YYYY-MM-DD HH:mm:ss.SSS (KST)
+ * 표준 ISO-8601 UTC 타임스탬프 반환
+ * PostgreSQL timestamptz 및 프론트엔드 Date 일관성을 완벽 보장합니다.
  */
 export function getKoreanNowString(date: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).formatToParts(date)
-
-  const getPart = (type: string) => parts.find((p) => p.type === type)?.value || '00'
-  const ms = String(date.getMilliseconds()).padStart(3, '0')
-  return `${getPart('year')}-${getPart('month')}-${getPart('day')} ${getPart('hour')}:${getPart('minute')}:${getPart('second')}.${ms}`
+  return date.toISOString()
 }
 
 /**

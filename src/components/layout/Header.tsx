@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import { formatMonthHeader, getAdjacentYearMonth, getCurrentYearMonth } from '../../utils/dateUtils'
+import { MonthPickerModal } from '../common/MonthPickerModal'
 
 export const Header: React.FC = () => {
   const {
@@ -30,6 +31,7 @@ export const Header: React.FC = () => {
   } = useAppStore()
 
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false)
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false)
   const isCurrentMonth = currentYearMonth === getCurrentYearMonth()
 
   const handlePrevMonth = () => {
@@ -38,10 +40,6 @@ export const Header: React.FC = () => {
 
   const handleNextMonth = () => {
     setCurrentYearMonth(getAdjacentYearMonth(currentYearMonth, 1))
-  }
-
-  const handleCurrentMonthClick = () => {
-    setCurrentYearMonth(getCurrentYearMonth())
   }
 
   const filterLabels = {
@@ -59,12 +57,12 @@ export const Header: React.FC = () => {
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl font-black text-white tracking-tight">가계부</h1>
 
-            {/* Sleek Month Navigator */}
-            <div className="flex items-center bg-slate-850/90 border border-slate-750/80 rounded-xl px-1.5 py-0.5">
+            {/* Sleek Month Navigator with Quick Direct Picker */}
+            <div className="flex items-center bg-[#16181f] border border-slate-800 rounded-xl px-1.5 py-0.5 shadow-sm">
               <button
                 type="button"
                 onClick={handlePrevMonth}
-                className="p-1 text-slate-400 hover:text-slate-100 active:scale-95 transition-all"
+                className="p-1 text-slate-400 hover:text-white active:scale-95 transition-all cursor-pointer"
                 aria-label="이전 달"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -72,20 +70,21 @@ export const Header: React.FC = () => {
 
               <button
                 type="button"
-                onClick={handleCurrentMonthClick}
-                className="px-1.5 py-0.5 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center gap-1"
-                title="이번 달로 이동"
+                onClick={() => setIsMonthPickerOpen(true)}
+                className="px-2 py-0.5 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
+                title="클릭하여 원하는 연도/월로 바로 이동"
               >
                 <span>{formatMonthHeader(currentYearMonth)}</span>
+                <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
                 {!isCurrentMonth && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" title="과거/미래 월 조회 중" />
                 )}
               </button>
 
               <button
                 type="button"
                 onClick={handleNextMonth}
-                className="p-1 text-slate-400 hover:text-slate-100 active:scale-95 transition-all"
+                className="p-1 text-slate-400 hover:text-white active:scale-95 transition-all cursor-pointer"
                 aria-label="다음 달"
               >
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -241,6 +240,13 @@ export const Header: React.FC = () => {
             </div>
           </div>
         )}
+        {/* Month Picker Modal */}
+        <MonthPickerModal
+          isOpen={isMonthPickerOpen}
+          onClose={() => setIsMonthPickerOpen(false)}
+          currentYearMonth={currentYearMonth}
+          onSelectYearMonth={setCurrentYearMonth}
+        />
       </div>
     </header>
   )

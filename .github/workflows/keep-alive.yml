@@ -2,16 +2,23 @@ name: Supabase Keep-Alive Ping
 
 on:
   schedule:
-    # 매 3일마다 오전 09:00 KST (00:00 UTC)에 자동 실행하여 Supabase 일시정지(Pause) 방지
+    # 매 3일마다 오전 09:00 KST (00:00 UTC)에 자동 실행
     - cron: '0 0 */3 * *'
   workflow_dispatch: # GitHub Actions 대시보드에서 원클릭 수동 테스트 가능
 
+# 깃허브 액션이 50일 이상 커밋이 없을 때 스스로 커밋을 갱신할 수 있도록 쓰기 권한 부여
+permissions:
+  contents: write
+
 jobs:
   ping:
-    name: Keep Supabase Awake
+    name: Keep Supabase & GitHub Awake
     runs-on: ubuntu-latest
     steps:
-      - name: Send API Ping
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Send API Ping to Supabase
         run: |
           echo "Sending keep-alive query to Supabase..."
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -27,3 +34,8 @@ jobs:
             echo "❌ Failed to ping Supabase. HTTP Status: $STATUS"
             exit 1
           fi
+
+      - name: Keep GitHub Actions Awake (Prevent 60-day inactivity suspension)
+        uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          use_api: true
